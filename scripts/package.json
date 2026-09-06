@@ -1,0 +1,10 @@
+{
+  "name": "tribuna-pro-sync",
+  "version": "1.0.0",
+  "private": true,
+  "main": "sync.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "axios": "^1.7.7"
+  }
+}

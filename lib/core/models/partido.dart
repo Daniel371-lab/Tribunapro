@@ -8,6 +8,11 @@ class Partido {
   final DateTime fecha;
   final String prediccionGanador;
   final String? prediccionGoles;
+  final String? porcentajeLocal;
+  final String? porcentajeEmpate;
+  final String? porcentajeVisitante;
+  final String? consejo;
+  final List<String>? h2h;
   final int? corners;
   final int? tarjetas;
   final bool esPro;
@@ -25,6 +30,11 @@ class Partido {
     required this.fecha,
     required this.prediccionGanador,
     this.prediccionGoles,
+    this.porcentajeLocal,
+    this.porcentajeEmpate,
+    this.porcentajeVisitante,
+    this.consejo,
+    this.h2h,
     this.corners,
     this.tarjetas,
     this.esPro = false,
@@ -44,6 +54,11 @@ class Partido {
       fecha: DateTime.parse(data['fecha']),
       prediccionGanador: data['prediccionGanador'],
       prediccionGoles: data['prediccionGoles'],
+      porcentajeLocal: data['porcentajeLocal'],
+      porcentajeEmpate: data['porcentajeEmpate'],
+      porcentajeVisitante: data['porcentajeVisitante'],
+      consejo: data['consejo'],
+      h2h: data['h2h'] != null ? List<String>.from(data['h2h']) : null,
       corners: data['corners'],
       tarjetas: data['tarjetas'],
       esPro: data['esPro'] ?? false,

@@ -4,7 +4,8 @@ import '../../../core/models/partido.dart';
 
 class PartidoCard extends StatelessWidget {
   final Partido partido;
-  const PartidoCard({super.key, required this.partido});
+  final VoidCallback? onTap;
+  const PartidoCard({super.key, required this.partido, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -13,57 +14,61 @@ class PartidoCard extends StatelessWidget {
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borde, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '${partido.competenciaNombre} · ${_formatearFecha(partido.fecha)}',
-                  style: TextStyle(fontSize: 11, color: textoSecundario),
-                  overflow: TextOverflow.ellipsis,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: superficie,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borde, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${partido.competenciaNombre} · ${_formatearFecha(partido.fecha)}',
+                    style: TextStyle(fontSize: 11, color: textoSecundario),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              if (partido.esPro && !partido.finalizado) _badgePro(),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(partido.equipoLocal, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  partido.finalizado ? (partido.resultado ?? 'vs') : 'vs',
-                  style: TextStyle(fontSize: 12, color: textoSecundario),
+                if (partido.esPro && !partido.finalizado) _badgePro(),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(partido.equipoLocal, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis),
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  partido.equipoVisitante,
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    partido.finalizado ? (partido.resultado ?? 'vs') : 'vs',
+                    style: TextStyle(fontSize: 12, color: textoSecundario),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (partido.finalizado) _chipResultado() else _filaPrediccion(),
-        ],
+                Expanded(
+                  child: Text(
+                    partido.equipoVisitante,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (partido.finalizado) _chipResultado() else _filaPrediccion(),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
 import '../../features/competencias/ligas_list_screen.dart';
@@ -8,6 +9,7 @@ import '../../features/competencias/competencia_detail_screen.dart';
 import '../../features/favoritos/favoritos_screen.dart';
 import '../../features/historial/historial_screen.dart';
 import '../../features/ajustes/ajustes_screen.dart';
+import '../../features/partido/partido_detail_screen.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -76,6 +78,11 @@ class AppRouter {
         path: '/ajustes',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AjustesScreen(),
+      ),
+      GoRoute(
+        path: '/partido',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => PartidoDetailScreen(partido: state.extra as Partido),
       ),
     ],
   );

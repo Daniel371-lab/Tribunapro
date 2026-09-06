@@ -56,7 +56,10 @@ class DashboardScreen extends StatelessWidget {
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   itemCount: partidos.length,
-                  itemBuilder: (context, index) => PartidoCard(partido: partidos[index]),
+                  itemBuilder: (context, index) => PartidoCard(
+                    partido: partidos[index],
+                    onTap: () => context.push('/partido', extra: partidos[index]),
+                  ),
                 );
               },
             ),

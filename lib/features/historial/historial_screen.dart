@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/firestore_service.dart';
 import '../dashboard/widgets/partido_card.dart';
 
@@ -31,7 +32,10 @@ class HistorialScreen extends StatelessWidget {
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   itemCount: partidos.length,
-                  itemBuilder: (context, index) => PartidoCard(partido: partidos[index]),
+                  itemBuilder: (context, index) => PartidoCard(
+                    partido: partidos[index],
+                    onTap: () => context.push('/partido', extra: partidos[index]),
+                  ),
                 );
               },
             ),
