@@ -7,38 +7,40 @@ class AjustesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                const Text('Ajustes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-              ],
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const Text('Ajustes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _item(context, Icons.person_outline, 'Perfil', onTap: () {}),
-                _itemModoOscuro(),
-                _item(context, Icons.workspace_premium_outlined, 'Modo Pro', onTap: () {}),
-                _item(context, Icons.bar_chart_outlined, 'Porcentaje de aciertos', onTap: () {}),
-                _item(context, Icons.info_outline, 'Sobre nosotros', onTap: () {}),
-                const Divider(height: 32),
-                _item(context, Icons.logout, 'Cerrar sesión', onTap: () {}),
-                _item(context, Icons.delete_outline, 'Eliminar cuenta', onTap: () {}, esPeligroso: true),
-              ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _item(context, Icons.person_outline, 'Perfil', onTap: () {}),
+                  _itemModoOscuro(),
+                  _item(context, Icons.workspace_premium_outlined, 'Modo Pro', onTap: () {}),
+                  _item(context, Icons.bar_chart_outlined, 'Porcentaje de aciertos', onTap: () {}),
+                  _item(context, Icons.info_outline, 'Sobre nosotros', onTap: () {}),
+                  const Divider(height: 32),
+                  _item(context, Icons.logout, 'Cerrar sesión', onTap: () {}),
+                  _item(context, Icons.delete_outline, 'Eliminar cuenta', onTap: () {}, esPeligroso: true),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
