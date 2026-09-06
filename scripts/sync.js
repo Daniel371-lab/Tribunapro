@@ -3,7 +3,15 @@ const { obtenerFixturesPorFecha, obtenerPrediccion } = require("./apiFootball");
 const { esDeLigas } = require("./ligas");
 const { esDeCopas } = require("./copas");
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+let serviceAccount;
+try {
+  const decodificado = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf-8");
+  serviceAccount = JSON.parse(decodificado);
+  console.log("Credencial OK — proyecto:", serviceAccount.project_id, "| cuenta:", serviceAccount.client_email);
+} catch (err) {
+  console.error("La credencial no se pudo leer correctamente:", err.message);
+  process.exit(1);
+}
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
