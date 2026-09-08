@@ -43,6 +43,12 @@ class Partido {
     this.acertado,
   });
 
+  static String? _comoPorcentaje(dynamic valor) {
+    if (valor == null) return null;
+    if (valor is String) return valor;
+    return '$valor%';
+  }
+
   factory Partido.fromMap(String id, Map<String, dynamic> data) {
     return Partido(
       id: id,
@@ -54,9 +60,9 @@ class Partido {
       fecha: DateTime.parse(data['fecha']),
       prediccionGanador: data['prediccionGanador'],
       prediccionGoles: data['prediccionGoles'],
-      porcentajeLocal: data['porcentajeLocal'],
-      porcentajeEmpate: data['porcentajeEmpate'],
-      porcentajeVisitante: data['porcentajeVisitante'],
+      porcentajeLocal: _comoPorcentaje(data['porcentajeLocal']),
+      porcentajeEmpate: _comoPorcentaje(data['porcentajeEmpate']),
+      porcentajeVisitante: _comoPorcentaje(data['porcentajeVisitante']),
       consejo: data['consejo'],
       h2h: data['h2h'] != null ? List<String>.from(data['h2h']) : null,
       corners: data['corners'],
