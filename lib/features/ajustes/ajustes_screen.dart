@@ -7,35 +7,131 @@ class AjustesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Cabecera con botón de retroceso
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(8, 12, 20, 12),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 20,
+                      color: textoPrincipal,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  const Text('Ajustes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Ajustes',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                      color: textoPrincipal,
+                    ),
+                  ),
                 ],
               ),
             ),
+
+            // Lista de configuraciones agrupadadas
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                physics: const BouncingScrollPhysics(),
                 children: [
-                  _item(context, Icons.person_outline, 'Perfil', onTap: () {}),
-                  _itemModoOscuro(),
-                  _item(context, Icons.workspace_premium_outlined, 'Modo Pro', onTap: () {}),
-                  _item(context, Icons.bar_chart_outlined, 'Porcentaje de aciertos', onTap: () {}),
-                  _item(context, Icons.info_outline, 'Sobre nosotros', onTap: () {}),
-                  const Divider(height: 32),
-                  _item(context, Icons.logout, 'Cerrar sesión', onTap: () {}),
-                  _item(context, Icons.delete_outline, 'Eliminar cuenta', onTap: () {}, esPeligroso: true),
+                  // Seccion General
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'GENERAL',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: textoSecundario,
+                      ),
+                    ),
+                  ),
+                  _buildGrupo(
+                    superficie: superficie,
+                    borde: borde,
+                    children: [
+                      _item(
+                        context,
+                        Icons.person_outline_rounded,
+                        'Perfil',
+                        onTap: () {},
+                      ),
+                      _itemModoOscuro(context),
+                      _item(
+                        context,
+                        Icons.workspace_premium_outlined,
+                        'Modo Pro',
+                        onTap: () {},
+                        badge: 'ACTIVO',
+                      ),
+                      _item(
+                        context,
+                        Icons.bar_chart_rounded,
+                        'Porcentaje de aciertos',
+                        onTap: () {},
+                      ),
+                      _item(
+                        context,
+                        Icons.info_outline_rounded,
+                        'Sobre nosotros',
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Seccion Cuenta / Acciones
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'CUENTA',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: textoSecundario,
+                      ),
+                    ),
+                  ),
+                  _buildGrupo(
+                    superficie: superficie,
+                    borde: borde,
+                    children: [
+                      _item(
+                        context,
+                        Icons.logout_rounded,
+                        'Cerrar sesión',
+                        onTap: () {},
+                      ),
+                      _item(
+                        context,
+                        Icons.delete_outline_rounded,
+                        'Eliminar cuenta',
+                        onTap: () {},
+                        esPeligroso: true,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -45,23 +141,136 @@ class AjustesScreen extends StatelessWidget {
     );
   }
 
-  Widget _item(BuildContext context, IconData icono, String texto, {required VoidCallback onTap, bool esPeligroso = false}) {
+  // Contenedor redondeado para agrupar ítems
+  Widget _buildGrupo({
+    required Color superficie,
+    required Color borde,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borde, width: 0.8),
+      ),
+      child: Column(
+        children: List.generate(children.length, (index) {
+          final esUltimo = index == children.length - 1;
+          return Column(
+            children: [
+              children[index],
+              if (!esUltimo)
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  indent: 52,
+                  color: borde,
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _item(
+    BuildContext context,
+    IconData icono,
+    String texto, {
+    required VoidCallback onTap,
+    bool esPeligroso = false,
+    String? badge,
+  }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final colorTexto = esPeligroso
+        ? AppColors.error
+        : (esOscuro ? AppColors.textoOscuro : AppColors.textoClaro);
+    final colorIcono = esPeligroso ? AppColors.error : AppColors.acento;
+
     return ListTile(
-      leading: Icon(icono, color: esPeligroso ? AppColors.error : null),
-      title: Text(texto, style: TextStyle(color: esPeligroso ? AppColors.error : null)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: (esPeligroso ? AppColors.error : AppColors.acento).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icono, size: 20, color: colorIcono),
+      ),
+      title: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: colorTexto,
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (badge != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.proBg,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                badge,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.pro,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+            color: esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro,
+          ),
+        ],
+      ),
       onTap: onTap,
     );
   }
 
-  Widget _itemModoOscuro() {
+  Widget _itemModoOscuro(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeModeNotifier,
       builder: (context, mode, _) {
+        final esActivo = mode == ThemeMode.dark;
+
         return ListTile(
-          leading: const Icon(Icons.dark_mode_outlined),
-          title: const Text('Modo oscuro'),
-          trailing: Switch(
-            value: mode == ThemeMode.dark,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.acento.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.dark_mode_outlined,
+              size: 20,
+              color: AppColors.acento,
+            ),
+          ),
+          title: Text(
+            'Modo oscuro',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: textoPrincipal,
+            ),
+          ),
+          trailing: Switch.adaptive(
+            value: esActivo,
+            activeColor: AppColors.acento,
             onChanged: (activo) {
               themeModeNotifier.value = activo ? ThemeMode.dark : ThemeMode.light;
             },

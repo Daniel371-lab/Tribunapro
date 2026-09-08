@@ -4,7 +4,9 @@ class Partido {
   final String competenciaId;
   final String competenciaNombre;
   final String equipoLocal;
+  final String? escudoLocal;
   final String equipoVisitante;
+  final String? escudoVisitante;
   final DateTime fecha;
   final String? prediccionGanador;
   final String? prediccionGoles;
@@ -26,7 +28,9 @@ class Partido {
     required this.competenciaId,
     required this.competenciaNombre,
     required this.equipoLocal,
+    this.escudoLocal,
     required this.equipoVisitante,
+    this.escudoVisitante,
     required this.fecha,
     this.prediccionGanador,
     this.prediccionGoles,
@@ -56,7 +60,9 @@ class Partido {
       competenciaId: data['competenciaId'],
       competenciaNombre: data['competenciaNombre'],
       equipoLocal: data['equipoLocal'],
+      escudoLocal: data['escudoLocal'],
       equipoVisitante: data['equipoVisitante'],
+      escudoVisitante: data['escudoVisitante'],
       fecha: DateTime.parse(data['fecha']),
       prediccionGanador: data['prediccionGanador'],
       prediccionGoles: data['prediccionGoles'],

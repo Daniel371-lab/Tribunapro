@@ -92,7 +92,9 @@ async function procesarPartidosNuevos(matches) {
       competenciaId: match.competition.code,
       competenciaNombre: nombre,
       equipoLocal: match.homeTeam.name,
+      escudoLocal: match.homeTeam.crest || null,
       equipoVisitante: match.awayTeam.name,
+      escudoVisitante: match.awayTeam.crest || null,
       fecha: match.utcDate,
       prediccionGanador: prediccion.ganador,
       prediccionGoles: null,
@@ -134,6 +136,8 @@ async function actualizarResultados(matches) {
       finalizado: true,
       resultado: `${golesLocal}-${golesVisitante}`,
       acertado: acerto,
+      escudoLocal: match.homeTeam.crest || null,
+      escudoVisitante: match.awayTeam.crest || null,
     });
     actualizados++;
   }
