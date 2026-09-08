@@ -13,12 +13,13 @@ class PartidoDetailScreen extends StatelessWidget {
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
             child: Row(
               children: [
                 IconButton(
@@ -183,8 +184,9 @@ class PartidoDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+     ),
+   );
+ }
 
   Widget _seccion(BuildContext context, {required String titulo, required Widget child}) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
