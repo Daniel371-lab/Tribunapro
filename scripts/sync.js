@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
-const { obtenerFixturesPorFecha, obtenerPrediccion } = require("./apiFootball");
-const { esDeLigas } = require("./ligas");
-const { esDeCopas } = require("./copas");
+const { obtenerPartidos, obtenerHeadToHead, obtenerTabla } = require("./footballData");
+const { esCompetenciaValida, datosCompetencia } = require("./competencias");
+const { calcularPrediccion } = require("./prediccion");
 
 let serviceAccount;
 try {
@@ -16,42 +16,92 @@ try {
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
+const tablasCache = {};
+
 function formatearFecha(date) {
   return date.toISOString().split("T")[0];
 }
 
-async function procesarFixturesNuevos(fecha) {
-  const fixtures = await obtenerFixturesPorFecha(fecha);
-  const relevantes = fixtures.filter((f) => esDeLigas(f) || esDeCopas(f));
+async function obtenerTablaCacheada(codigo) {
+  if (tablasCache[codigo] !== undefined) return tablasCache[codigo];
+  try {
+    const tabla = await obtenerTabla(codigo);
+    tablasCache[codigo] = tabla;
+    return tabla;
+  } catch (err) {
+    console.error(`No se pudo traer tabla de ${codigo}:`, err.message);
+    tablasCache[codigo] = null;
+    return null;
+  }
+}
 
+function datosDeEquipoEnTabla(tabla, equipoId) {
+  if (!tabla || !tabla.standings) return null;
+  const grupoTotal = tabla.standings.find((s) => s.type === "TOTAL");
+  if (!grupoTotal) return null;
+  const fila = grupoTotal.table.find((f) => f.team.id === equipoId);
+  if (!fila) return null;
+  return { posicion: fila.position, forma: fila.form, totalEquipos: grupoTotal.table.length };
+}
+
+async function armarPrediccion(match) {
+  let h2h = null;
+  try {
+    h2h = await obtenerHeadToHead(match.id);
+  } catch (err) {
+    console.error(`No se pudo traer head2head de match=${match.id}:`, err.message);
+  }
+
+  const tabla = await obtenerTablaCacheada(match.competition.code);
+  const datosLocal = datosDeEquipoEnTabla(tabla, match.homeTeam.id);
+  const datosVisitante = datosDeEquipoEnTabla(tabla, match.awayTeam.id);
+
+  const prediccion = calcularPrediccion({
+    h2h,
+    idLocal: match.homeTeam.id,
+    formaLocal: datosLocal?.forma,
+    formaVisitante: datosVisitante?.forma,
+    posicionLocal: datosLocal?.posicion,
+    posicionVisitante: datosVisitante?.posicion,
+    totalEquipos: datosLocal?.totalEquipos,
+    nombreLocal: match.homeTeam.name,
+    nombreVisitante: match.awayTeam.name,
+  });
+
+  const h2hTexto = (h2h?.matches ?? [])
+    .slice(0, 5)
+    .map((p) => `${p.homeTeam.name} ${p.score.fullTime.home}-${p.score.fullTime.away} ${p.awayTeam.name}`);
+
+  return { prediccion, h2hTexto };
+}
+
+async function procesarPartidosNuevos(matches) {
   let nuevos = 0;
-  for (const fixture of relevantes) {
-    const id = String(fixture.fixture.id);
+  for (const match of matches) {
+    if (!esCompetenciaValida(match)) continue;
+
+    const id = String(match.id);
     const doc = await db.collection("partidos").doc(id).get();
     if (doc.exists) continue;
 
-    const prediccion = await obtenerPrediccion(fixture.fixture.id);
-    const tipo = esDeLigas(fixture) ? "liga" : "copa";
-
-    const h2h = (prediccion?.h2h ?? [])
-      .slice(0, 5)
-      .map((p) => `${p.teams.home.name} ${p.goals.home}-${p.goals.away} ${p.teams.away.name}`);
+    const { prediccion, h2hTexto } = await armarPrediccion(match);
+    const { nombre, tipo } = datosCompetencia(match.competition.code);
 
     await db.collection("partidos").doc(id).set({
       tipo,
-      competenciaId: String(fixture.league.id),
-      competenciaNombre: fixture.league.name,
-      equipoLocal: fixture.teams.home.name,
-      equipoVisitante: fixture.teams.away.name,
-      fecha: fixture.fixture.date,
-      prediccionGanador: prediccion?.predictions?.winner?.name ?? "Sin datos",
-      prediccionGoles: prediccion?.predictions?.goals?.home ?? null,
-      porcentajeLocal: prediccion?.predictions?.percent?.home ?? null,
-      porcentajeEmpate: prediccion?.predictions?.percent?.draw ?? null,
-      porcentajeVisitante: prediccion?.predictions?.percent?.away ?? null,
-      consejo: prediccion?.predictions?.advice ?? null,
-      h2h: h2h.length > 0 ? h2h : null,
-      esPro: tipo === "copa",
+      competenciaId: match.competition.code,
+      competenciaNombre: nombre,
+      equipoLocal: match.homeTeam.name,
+      equipoVisitante: match.awayTeam.name,
+      fecha: match.utcDate,
+      prediccionGanador: prediccion.ganador,
+      prediccionGoles: null,
+      porcentajeLocal: prediccion.porcentajeLocal,
+      porcentajeEmpate: prediccion.porcentajeEmpate,
+      porcentajeVisitante: prediccion.porcentajeVisitante,
+      consejo: prediccion.consejo,
+      h2h: h2hTexto.length > 0 ? h2hTexto : null,
+      esPro: false,
       finalizado: false,
       resultado: null,
       acertado: null,
@@ -61,25 +111,22 @@ async function procesarFixturesNuevos(fecha) {
   return nuevos;
 }
 
-async function actualizarResultados(fecha) {
-  const fixtures = await obtenerFixturesPorFecha(fecha);
-  const finalizados = fixtures.filter((f) => f.fixture.status.short === "FT");
+async function actualizarResultados(matches) {
+  const finalizados = matches.filter((m) => m.status === "FINISHED");
 
   let actualizados = 0;
-  for (const fixture of finalizados) {
-    const id = String(fixture.fixture.id);
+  for (const match of finalizados) {
+    const id = String(match.id);
     const ref = db.collection("partidos").doc(id);
     const doc = await ref.get();
     if (!doc.exists || doc.data().finalizado) continue;
 
-    const golesLocal = fixture.goals.home;
-    const golesVisitante = fixture.goals.away;
+    const golesLocal = match.score.fullTime.home;
+    const golesVisitante = match.score.fullTime.away;
     const ganadorReal =
-      golesLocal > golesVisitante
-        ? fixture.teams.home.name
-        : golesVisitante > golesLocal
-        ? fixture.teams.away.name
-        : "Empate";
+      golesLocal > golesVisitante ? match.homeTeam.name
+      : golesVisitante > golesLocal ? match.awayTeam.name
+      : "Empate";
 
     const acerto = doc.data().prediccionGanador === ganadorReal;
 
@@ -112,19 +159,21 @@ async function purgarVencidos() {
 
 async function main() {
   const hoy = new Date();
+  const dentroDeDosDias = new Date(hoy);
+  dentroDeDosDias.setDate(dentroDeDosDias.getDate() + 2);
 
-  await actualizarResultados(formatearFecha(hoy));
+  const desde = formatearFecha(hoy);
+  const hasta = formatearFecha(dentroDeDosDias);
 
-  let totalNuevos = 0;
-  for (let i = 0; i <= 2; i++) {
-    const fecha = new Date(hoy);
-    fecha.setDate(fecha.getDate() + i);
-    totalNuevos += await procesarFixturesNuevos(formatearFecha(fecha));
-  }
+  console.log(`Trayendo partidos de ${desde} a ${hasta}...`);
+  const partidos = await obtenerPartidos(desde, hasta);
+  console.log(`Total partidos recibidos: ${partidos.length}`);
 
+  const actualizados = await actualizarResultados(partidos);
+  const nuevos = await procesarPartidosNuevos(partidos);
   const borrados = await purgarVencidos();
 
-  console.log(`Nuevos: ${totalNuevos} | Purgados: ${borrados}`);
+  console.log(`Nuevos: ${nuevos} | Resultados actualizados: ${actualizados} | Purgados: ${borrados}`);
 }
 
 main()

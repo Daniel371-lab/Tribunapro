@@ -65,8 +65,10 @@ class PartidoCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            if (partido.finalizado) _chipResultado() else _filaPrediccion(),
+            if (partido.finalizado || partido.prediccionGanador != null) ...[
+              const SizedBox(height: 10),
+              if (partido.finalizado) _chipResultado() else _filaPrediccion(),
+            ],
           ],
         ),
       ),
@@ -76,7 +78,7 @@ class PartidoCard extends StatelessWidget {
   Widget _filaPrediccion() {
     return Row(
       children: [
-        Expanded(child: _chip(partido.prediccionGanador)),
+        Expanded(child: _chip(partido.prediccionGanador!)),
         if (partido.prediccionGoles != null) ...[
           const SizedBox(width: 8),
           Expanded(child: _chip(partido.prediccionGoles!, esSecundario: true)),

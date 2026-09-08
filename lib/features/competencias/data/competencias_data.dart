@@ -6,27 +6,26 @@ class Competencia {
 
 class CompetenciasData {
   static const ligas = [
-    Competencia('39', 'Premier League'),
-    Competencia('140', 'La Liga'),
-    Competencia('135', 'Serie A'),
-    Competencia('78', 'Bundesliga'),
-    Competencia('61', 'Ligue 1'),
-    Competencia('71', 'Brasileirão'),
-    Competencia('128', 'Liga Profesional Argentina'),
-    Competencia('250', 'Primera División Paraguay'),
-    Competencia('253', 'MLS'),
-    Competencia('262', 'Liga MX'),
+    Competencia('PL', 'Premier League'),
+    Competencia('PD', 'La Liga'),
+    Competencia('SA', 'Serie A'),
+    Competencia('BL1', 'Bundesliga'),
+    Competencia('FL1', 'Ligue 1'),
+    Competencia('DED', 'Eredivisie'),
+    Competencia('PPL', 'Primeira Liga'),
+    Competencia('ELC', 'Championship'),
+    Competencia('BSA', 'Brasileirão'),
   ];
 
   static const copas = [
-    Competencia('2', 'Champions League'),
-    Competencia('3', 'Europa League'),
-    Competencia('13', 'Copa Libertadores'),
-    Competencia('11', 'Copa Sudamericana'),
+    Competencia('CL', 'Champions League'),
+    Competencia('WC', 'Copa Mundial de la FIFA'),
+    Competencia('EC', 'Eurocopa'),
   ];
 
+  static List<Competencia> get todas => [...ligas, ...copas];
+
   static String nombrePorId(String id) {
-    final todas = [...ligas, ...copas];
     return todas.firstWhere((c) => c.id == id, orElse: () => Competencia(id, id)).nombre;
   }
 }

@@ -6,7 +6,7 @@ class Partido {
   final String equipoLocal;
   final String equipoVisitante;
   final DateTime fecha;
-  final String prediccionGanador;
+  final String? prediccionGanador;
   final String? prediccionGoles;
   final String? porcentajeLocal;
   final String? porcentajeEmpate;
@@ -28,7 +28,7 @@ class Partido {
     required this.equipoLocal,
     required this.equipoVisitante,
     required this.fecha,
-    required this.prediccionGanador,
+    this.prediccionGanador,
     this.prediccionGoles,
     this.porcentajeLocal,
     this.porcentajeEmpate,

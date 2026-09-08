@@ -107,7 +107,7 @@ class PartidoDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                ] else ...[
+                ] else if (partido.prediccionGanador != null) ...[
                   _seccion(
                     context,
                     titulo: 'Predicción',

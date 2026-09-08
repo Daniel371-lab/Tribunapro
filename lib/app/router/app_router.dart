@@ -3,8 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
-import '../../features/competencias/ligas_list_screen.dart';
-import '../../features/competencias/copas_list_screen.dart';
 import '../../features/competencias/competencia_detail_screen.dart';
 import '../../features/favoritos/favoritos_screen.dart';
 import '../../features/historial/historial_screen.dart';
@@ -35,28 +33,10 @@ class AppRouter {
                 builder: (context, state) => const CompetenciasScreen(),
                 routes: [
                   GoRoute(
-                    path: 'ligas',
-                    builder: (context, state) => const LigasListScreen(),
-                    routes: [
-                      GoRoute(
-                        path: ':id',
-                        builder: (context, state) => CompetenciaDetailScreen(
-                          competenciaId: state.pathParameters['id']!,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'copas',
-                    builder: (context, state) => const CopasListScreen(),
-                    routes: [
-                      GoRoute(
-                        path: ':id',
-                        builder: (context, state) => CompetenciaDetailScreen(
-                          competenciaId: state.pathParameters['id']!,
-                        ),
-                      ),
-                    ],
+                    path: ':id',
+                    builder: (context, state) => CompetenciaDetailScreen(
+                      competenciaId: state.pathParameters['id']!,
+                    ),
                   ),
                 ],
               ),
