@@ -75,42 +75,56 @@ async function armarPrediccion(match) {
   return { prediccion, h2hTexto };
 }
 
-async function procesarPartidosNuevos(matches) {
+async function procesarPartidos(matches) {
   let nuevos = 0;
+  let actualizadosEscudos = 0;
+
   for (const match of matches) {
     if (!esCompetenciaValida(match)) continue;
 
     const id = String(match.id);
-    const doc = await db.collection("partidos").doc(id).get();
-    if (doc.exists) continue;
+    const ref = db.collection("partidos").doc(id);
+    const doc = await ref.get();
 
-    const { prediccion, h2hTexto } = await armarPrediccion(match);
-    const { nombre, tipo } = datosCompetencia(match.competition.code);
+    const escudoLocal = match.homeTeam.crest || null;
+    const escudoVisitante = match.awayTeam.crest || null;
 
-    await db.collection("partidos").doc(id).set({
-      tipo,
-      competenciaId: match.competition.code,
-      competenciaNombre: nombre,
-      equipoLocal: match.homeTeam.name,
-      escudoLocal: match.homeTeam.crest || null,
-      equipoVisitante: match.awayTeam.name,
-      escudoVisitante: match.awayTeam.crest || null,
-      fecha: match.utcDate,
-      prediccionGanador: prediccion.ganador,
-      prediccionGoles: null,
-      porcentajeLocal: prediccion.porcentajeLocal,
-      porcentajeEmpate: prediccion.porcentajeEmpate,
-      porcentajeVisitante: prediccion.porcentajeVisitante,
-      consejo: prediccion.consejo,
-      h2h: h2hTexto.length > 0 ? h2hTexto : null,
-      esPro: false,
-      finalizado: false,
-      resultado: null,
-      acertado: null,
-    });
-    nuevos++;
+    if (!doc.exists) {
+      const { prediccion, h2hTexto } = await armarPrediccion(match);
+      const { nombre, tipo } = datosCompetencia(match.competition.code);
+
+      await ref.set({
+        tipo,
+        competenciaId: match.competition.code,
+        competenciaNombre: nombre,
+        equipoLocal: match.homeTeam.name,
+        escudoLocal,
+        equipoVisitante: match.awayTeam.name,
+        escudoVisitante,
+        fecha: match.utcDate,
+        prediccionGanador: prediccion.ganador,
+        prediccionGoles: null,
+        porcentajeLocal: prediccion.porcentajeLocal,
+        porcentajeEmpate: prediccion.porcentajeEmpate,
+        porcentajeVisitante: prediccion.porcentajeVisitante,
+        consejo: prediccion.consejo,
+        h2h: h2hTexto.length > 0 ? h2hTexto : null,
+        esPro: false,
+        finalizado: false,
+        resultado: null,
+        acertado: null,
+      });
+      nuevos++;
+    } else {
+      // Asegura actualizar los escudos en partidos que ya estaban creados
+      await ref.set({
+        escudoLocal,
+        escudoVisitante,
+      }, { merge: true });
+      actualizadosEscudos++;
+    }
   }
-  return nuevos;
+  return { nuevos, actualizadosEscudos };
 }
 
 async function actualizarResultados(matches) {
@@ -173,11 +187,11 @@ async function main() {
   const partidos = await obtenerPartidos(desde, hasta);
   console.log(`Total partidos recibidos: ${partidos.length}`);
 
-  const actualizados = await actualizarResultados(partidos);
-  const nuevos = await procesarPartidosNuevos(partidos);
+  const actualizadosResultados = await actualizarResultados(partidos);
+  const { nuevos, actualizadosEscudos } = await procesarPartidos(partidos);
   const borrados = await purgarVencidos();
 
-  console.log(`Nuevos: ${nuevos} | Resultados actualizados: ${actualizados} | Purgados: ${borrados}`);
+  console.log(`Nuevos: ${nuevos} | Escudos sincronizados en existentes: ${actualizadosEscudos} | Resultados actualizados: ${actualizadosResultados} | Purgados: ${borrados}`);
 }
 
 main()
