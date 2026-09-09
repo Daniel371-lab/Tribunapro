@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
 import '../../app/theme/app_colors.dart';
+
+const String _idPaquete = 'com.jplabs.tribunapro.tribunapro';
+const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
 
 class AjustesScreen extends StatelessWidget {
   const AjustesScreen({super.key});
@@ -81,19 +86,24 @@ class AjustesScreen extends StatelessWidget {
                         Icons.workspace_premium_outlined,
                         'Modo Pro',
                         onTap: () {},
-                        badge: 'ACTIVO',
-                      ),
-                      _item(
-                        context,
-                        Icons.bar_chart_rounded,
-                        'Porcentaje de aciertos',
-                        onTap: () {},
                       ),
                       _item(
                         context,
                         Icons.info_outline_rounded,
                         'Sobre nosotros',
-                        onTap: () {},
+                        onTap: () => _mostrarAcercaDe(context),
+                      ),
+                      _item(
+                        context,
+                        Icons.star_outline_rounded,
+                        'Calificar la app',
+                        onTap: () => _mostrarCalificar(context),
+                      ),
+                      _item(
+                        context,
+                        Icons.share_outlined,
+                        'Compartir',
+                        onTap: () => _compartirApp(),
                       ),
                     ],
                   ),
@@ -138,6 +148,122 @@ class AjustesScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // ==== VENTANA: Acerca de ====
+  void _mostrarAcercaDe(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: superficie,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
+              const SizedBox(height: 16),
+              Text(
+                'Tribuna pro',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Versión 1.0.0',
+                style: TextStyle(fontSize: 13, color: textoSecundario),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Desarrollado por JPLABS',
+                style: TextStyle(fontSize: 13, color: textoSecundario),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ==== VENTANA: Calificar la app ====
+  void _mostrarCalificar(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: superficie,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '¿Te gusta la app?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Calificanos en Play Store, nos ayuda un montón.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: textoSecundario),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                  (index) => Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.acento,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _abrirPlayStore();
+                  },
+                  child: const Text('Calificar en Play Store'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _abrirPlayStore() async {
+    final uri = Uri.parse(_urlPlayStore);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  // ==== Compartir ====
+  Future<void> _compartirApp() async {
+    await Share.share(
+      'Descargá Tribuna pro, predicciones de fútbol de las principales ligas y copas del mundo 🏆⚽\n$_urlPlayStore',
     );
   }
 

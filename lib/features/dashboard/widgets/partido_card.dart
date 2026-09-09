@@ -147,39 +147,6 @@ class PartidoCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
-                // Predicción / Estado de acierto
-                if (partido.prediccionGanador != null || partido.finalizado) ...[
-                  const SizedBox(height: 12),
-                  const Divider(height: 1, thickness: 0.5),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Icon(
-                        partido.finalizado
-                            ? ((partido.acertado ?? false) ? Icons.check_circle_rounded : Icons.cancel_rounded)
-                            : Icons.auto_awesome_rounded,
-                        size: 14,
-                        color: partido.finalizado
-                            ? ((partido.acertado ?? false) ? AppColors.acento : AppColors.error)
-                            : AppColors.acento,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        partido.finalizado
-                            ? ((partido.acertado ?? false) ? 'Predicción acertada' : 'Predicción no acertada')
-                            : 'Predicción: ${partido.prediccionGanador}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: partido.finalizado
-                              ? ((partido.acertado ?? false) ? AppColors.acento : AppColors.error)
-                              : textoSecundario,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
