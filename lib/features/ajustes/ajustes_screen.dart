@@ -4,8 +4,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
 import '../../app/theme/app_colors.dart';
-// TODO: Importa aquí el archivo donde está tu pantalla de Login
-// import '../login/login_screen.dart';
+import '../login/login_screen.dart';
+import '../login/registro_screen.dart';
 
 const String _idPaquete = 'com.jplabs.tribunapro.tribunapro';
 const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
@@ -54,7 +54,7 @@ class AjustesScreen extends StatelessWidget {
               ),
             ),
 
-            // Lista de configuraciones agrupadadas
+            // Lista de configuraciones agrupadas
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -154,20 +154,13 @@ class AjustesScreen extends StatelessWidget {
     );
   }
 
-  // ==== ACCIONES DE SESIÓN Y CUENTA ====
+  // ==== NAVEGACIÓN Y SESIÓN ====
 
   void _irALogin(BuildContext context) {
-    // TODO: Reemplaza "LoginScreen()" por el nombre exacto de tu clase de Login
-    // pushAndRemoveUntil elimina todas las pantallas anteriores para que no puedan volver atrás
-    /*
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (Route<dynamic> route) => false,
     );
-    */
-    
-    // Si usas rutas nombradas sería:
-    // Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   void _confirmarCerrarSesion(BuildContext context, Color textoPrincipal, Color textoSecundario, Color superficie) {
@@ -189,8 +182,8 @@ class AjustesScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
-              Navigator.pop(context); // Cierra el dialog
-              await FirebaseAuth.instance.signOut(); // Cierra sesión (sirve tanto para invitados como usuarios normales)
+              Navigator.pop(context);
+              await FirebaseAuth.instance.signOut();
               if (context.mounted) _irALogin(context);
             },
             child: const Text('Sí, salir', style: TextStyle(color: Colors.white)),
@@ -222,23 +215,19 @@ class AjustesScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
-              Navigator.pop(context); // Cierra el dialog
-              
+              Navigator.pop(context);
               try {
                 final user = FirebaseAuth.instance.currentUser;
                 final esInvitado = user == null || user.isAnonymous;
 
-                // Si es un usuario con cuenta, la eliminamos de la base de datos de Auth
                 if (!esInvitado) {
                   await user.delete();
                 } else {
-                  // Si es invitado, solo cerramos la sesión anónima
                   await FirebaseAuth.instance.signOut();
                 }
 
                 if (context.mounted) _irALogin(context);
               } on FirebaseAuthException catch (e) {
-                // Firebase a veces requiere que el usuario se haya logueado recientemente para poder borrar la cuenta.
                 if (e.code == 'requires-recent-login') {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +250,7 @@ class AjustesScreen extends StatelessWidget {
   }
 
   // ==== VENTANA: Perfil ====
+
   void _mostrarPerfil(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final esInvitado = user == null || user.isAnonymous;
@@ -272,17 +262,25 @@ class AjustesScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: superficie,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-          child: esInvitado
-              ? _buildPerfilInvitado(context, textoPrincipal, textoSecundario)
-              : _buildPerfilUsuario(context, textoPrincipal, textoSecundario),
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 28,
+              bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: esInvitado
+                ? _buildPerfilInvitado(context, textoPrincipal, textoSecundario)
+                : _buildPerfilUsuario(context, user, superficie, textoPrincipal, textoSecundario),
+          ),
         );
       },
     );
@@ -316,9 +314,11 @@ class AjustesScreen extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () {
-              Navigator.pop(context); 
-              // TODO: Navegar a la pantalla de registro
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => TuPantallaDeRegistro()));
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegistroScreen()),
+              );
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -345,7 +345,13 @@ class AjustesScreen extends StatelessWidget {
   }
 
   // Vista para Usuarios con cuenta
-  Widget _buildPerfilUsuario(BuildContext context, Color textoPrincipal, Color textoSecundario) {
+  Widget _buildPerfilUsuario(
+    BuildContext context,
+    User user,
+    Color superficie,
+    Color textoPrincipal,
+    Color textoSecundario,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,7 +378,7 @@ class AjustesScreen extends StatelessWidget {
           trailing: Icon(Icons.chevron_right_rounded, size: 20, color: textoSecundario),
           onTap: () {
             Navigator.pop(context);
-            // TODO: Acción para abrir formulario/dialog para cambiar nombre
+            _dialogCambiarNombre(context, user, superficie, textoPrincipal, textoSecundario);
           },
         ),
         Divider(height: 1, thickness: 0.5, color: textoSecundario.withValues(alpha: 0.2)),
@@ -393,14 +399,159 @@ class AjustesScreen extends StatelessWidget {
           trailing: Icon(Icons.chevron_right_rounded, size: 20, color: textoSecundario),
           onTap: () {
             Navigator.pop(context);
-            // TODO: Acción para abrir formulario/dialog de contraseña
+            _dialogCambiarPassword(context, user, superficie, textoPrincipal, textoSecundario);
           },
         ),
       ],
     );
   }
 
+  // ==== DIÁLOGOS DE EDICIÓN DE PERFIL ====
+
+  void _dialogCambiarNombre(
+    BuildContext context,
+    User user,
+    Color superficie,
+    Color textoPrincipal,
+    Color textoSecundario,
+  ) {
+    final controller = TextEditingController(text: user.displayName ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: superficie,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Cambiar nombre', style: TextStyle(color: textoPrincipal, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          style: TextStyle(color: textoPrincipal),
+          decoration: InputDecoration(
+            labelText: 'Nuevo nombre',
+            labelStyle: TextStyle(color: textoSecundario),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.acento)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: textoSecundario)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.acento,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final nuevoNombre = controller.text.trim();
+              if (nuevoNombre.isNotEmpty) {
+                try {
+                  await user.updateDisplayName(nuevoNombre);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nombre actualizado correctamente')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al actualizar nombre: $e'), backgroundColor: AppColors.error),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Guardar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _dialogCambiarPassword(
+    BuildContext context,
+    User user,
+    Color superficie,
+    Color textoPrincipal,
+    Color textoSecundario,
+  ) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: superficie,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Cambiar contraseña', style: TextStyle(color: textoPrincipal, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          style: TextStyle(color: textoPrincipal),
+          decoration: InputDecoration(
+            labelText: 'Nueva contraseña',
+            labelStyle: TextStyle(color: textoSecundario),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.acento)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: textoSecundario)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.acento,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final nuevaPass = controller.text.trim();
+              if (nuevaPass.length >= 6) {
+                try {
+                  await user.updatePassword(nuevaPass);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Contraseña actualizada correctamente')),
+                    );
+                  }
+                } on FirebaseAuthException catch (e) {
+                  if (context.mounted) {
+                    String msg = 'Error al actualizar contraseña';
+                    if (e.code == 'requires-recent-login') {
+                      msg = 'Por seguridad, debes volver a iniciar sesión antes de cambiar tu contraseña.';
+                    } else if (e.code == 'weak-password') {
+                      msg = 'La contraseña es muy débil. Usa al menos 6 caracteres.';
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+                    );
+                  }
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('La contraseña debe tener al menos 6 caracteres'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Guardar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==== VENTANA: Acerca de ====
+
   void _mostrarAcercaDe(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
@@ -409,34 +560,42 @@ class AjustesScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: superficie,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
-              const SizedBox(height: 16),
-              Text(
-                'Tribuna Pro',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Versión 1.0.0',
-                style: TextStyle(fontSize: 13, color: textoSecundario),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Desarrollado por JPLABS',
-                style: TextStyle(fontSize: 13, color: textoSecundario),
-              ),
-            ],
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 28,
+              bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
+                const SizedBox(height: 16),
+                Text(
+                  'Tribuna Pro',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Versión 1.0.0',
+                  style: TextStyle(fontSize: 13, color: textoSecundario),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Desarrollado por JPLABS',
+                  style: TextStyle(fontSize: 13, color: textoSecundario),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -444,6 +603,7 @@ class AjustesScreen extends StatelessWidget {
   }
 
   // ==== VENTANA: Calificar la app ====
+
   void _mostrarCalificar(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
@@ -452,52 +612,60 @@ class AjustesScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: superficie,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '¿Te gusta la app?',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Calificanos en Play Store, nos ayuda un montón.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: textoSecundario),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  5,
-                  (index) => const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 28,
+              bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '¿Te gusta la app?',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.acento,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 6),
+                Text(
+                  'Calificanos en Play Store, nos ayuda un montón.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: textoSecundario),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    5,
+                    (index) => const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _abrirPlayStore();
-                  },
-                  child: const Text('Calificar en Play Store'),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.acento,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _abrirPlayStore();
+                    },
+                    child: const Text('Calificar en Play Store'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -510,6 +678,7 @@ class AjustesScreen extends StatelessWidget {
   }
 
   // ==== Compartir ====
+
   Future<void> _compartirApp() async {
     await Share.share(
       'Descargá Tribuna pro, predicciones de fútbol de las principales ligas y copas del mundo 🏆⚽\n$_urlPlayStore',
