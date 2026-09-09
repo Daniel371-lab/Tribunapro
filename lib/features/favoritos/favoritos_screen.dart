@@ -104,12 +104,9 @@ class FavoritosScreen extends StatelessWidget {
                   itemCount: marcadas.length,
                   itemBuilder: (context, index) {
                     final c = marcadas[index];
-                    final esLiga = CompetenciasData.ligas.contains(c);
                     return CompetenciaTile(
                       competencia: c,
-                      onTap: () => context.push(
-                        '/competencias/${esLiga ? 'ligas' : 'copas'}/${c.id}',
-                      ),
+                      onTap: () => context.push('/competencias/${c.id}'),
                     );
                   },
                 );
