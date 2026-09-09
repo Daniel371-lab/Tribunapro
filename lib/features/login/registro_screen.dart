@@ -43,7 +43,12 @@ class _RegistroScreenState extends State<RegistroScreen> {
   }
 
   String? _validarNombre(String? valor) {
-    if (valor == null || valor.trim().isEmpty) return 'Este campo es obligatorio.';
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return 'Este campo es obligatorio.';
+    if (texto.length < 2) return 'Debe tener al menos 2 caracteres.';
+    if (texto.length > 30) return 'No puede superar los 30 caracteres.';
+    final regex = RegExp(r'^[A-Za-zÀ-ÿñÑ\s]+$');
+    if (!regex.hasMatch(texto)) return 'Solo se permiten letras.';
     return null;
   }
 
@@ -110,12 +115,14 @@ class _RegistroScreenState extends State<RegistroScreen> {
 
                 TextFormField(
                   controller: _nombreCtrl,
+                  maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder()),
                   validator: _validarNombre,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _apellidoCtrl,
+                  maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Apellido', border: OutlineInputBorder()),
                   validator: _validarNombre,
                 ),

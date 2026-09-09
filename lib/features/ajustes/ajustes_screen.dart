@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
 import '../../app/theme/app_colors.dart';
+// TODO: Importa aquí el archivo donde está tu pantalla de Login
+// import '../login/login_screen.dart';
 
 const String _idPaquete = 'com.jplabs.tribunapro.tribunapro';
 const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
@@ -78,7 +81,7 @@ class AjustesScreen extends StatelessWidget {
                         context,
                         Icons.person_outline_rounded,
                         'Perfil',
-                        onTap: () {},
+                        onTap: () => _mostrarPerfil(context),
                       ),
                       _itemModoOscuro(context),
                       _item(
@@ -131,13 +134,13 @@ class AjustesScreen extends StatelessWidget {
                         context,
                         Icons.logout_rounded,
                         'Cerrar sesión',
-                        onTap: () {},
+                        onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
                       ),
                       _item(
                         context,
                         Icons.delete_outline_rounded,
                         'Eliminar cuenta',
-                        onTap: () {},
+                        onTap: () => _confirmarEliminarCuenta(context, textoPrincipal, textoSecundario, superficie),
                         esPeligroso: true,
                       ),
                     ],
@@ -148,6 +151,252 @@ class AjustesScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // ==== ACCIONES DE SESIÓN Y CUENTA ====
+
+  void _irALogin(BuildContext context) {
+    // TODO: Reemplaza "LoginScreen()" por el nombre exacto de tu clase de Login
+    // pushAndRemoveUntil elimina todas las pantallas anteriores para que no puedan volver atrás
+    /*
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (Route<dynamic> route) => false,
+    );
+    */
+    
+    // Si usas rutas nombradas sería:
+    // Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
+  void _confirmarCerrarSesion(BuildContext context, Color textoPrincipal, Color textoSecundario, Color superficie) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: superficie,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Cerrar sesión', style: TextStyle(color: textoPrincipal, fontWeight: FontWeight.bold)),
+        content: Text('¿Estás seguro de que deseas cerrar sesión?', style: TextStyle(color: textoSecundario)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: textoSecundario)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.acento,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(context); // Cierra el dialog
+              await FirebaseAuth.instance.signOut(); // Cierra sesión (sirve tanto para invitados como usuarios normales)
+              if (context.mounted) _irALogin(context);
+            },
+            child: const Text('Sí, salir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarEliminarCuenta(BuildContext context, Color textoPrincipal, Color textoSecundario, Color superficie) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: superficie,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Eliminar cuenta', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Esta acción es irreversible. Se perderán todos tus datos y configuraciones. ¿Estás seguro?',
+          style: TextStyle(color: textoSecundario),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: textoSecundario)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(context); // Cierra el dialog
+              
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                final esInvitado = user == null || user.isAnonymous;
+
+                // Si es un usuario con cuenta, la eliminamos de la base de datos de Auth
+                if (!esInvitado) {
+                  await user.delete();
+                } else {
+                  // Si es invitado, solo cerramos la sesión anónima
+                  await FirebaseAuth.instance.signOut();
+                }
+
+                if (context.mounted) _irALogin(context);
+              } on FirebaseAuthException catch (e) {
+                // Firebase a veces requiere que el usuario se haya logueado recientemente para poder borrar la cuenta.
+                if (e.code == 'requires-recent-login') {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Por seguridad, debes volver a iniciar sesión antes de eliminar tu cuenta.'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                    await FirebaseAuth.instance.signOut();
+                    _irALogin(context);
+                  }
+                }
+              }
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==== VENTANA: Perfil ====
+  void _mostrarPerfil(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final esInvitado = user == null || user.isAnonymous;
+
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: superficie,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          child: esInvitado
+              ? _buildPerfilInvitado(context, textoPrincipal, textoSecundario)
+              : _buildPerfilUsuario(context, textoPrincipal, textoSecundario),
+        );
+      },
+    );
+  }
+
+  // Vista para Invitados
+  Widget _buildPerfilInvitado(BuildContext context, Color textoPrincipal, Color textoSecundario) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.account_circle_outlined, size: 48, color: textoSecundario),
+        const SizedBox(height: 16),
+        Text(
+          'Aún no tienes un perfil',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Crea una cuenta para guardar tus configuraciones y acceder a todas las funciones.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: textoSecundario),
+        ),
+        const SizedBox(height: 24),
+        Card(
+          elevation: 0,
+          color: AppColors.acento.withValues(alpha: 0.1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.acento.withValues(alpha: 0.3), width: 1),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.pop(context); 
+              // TODO: Navegar a la pantalla de registro
+              // Navigator.push(context, MaterialPageRoute(builder: (_) => TuPantallaDeRegistro()));
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.person_add_alt_1_rounded, color: AppColors.acento),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Crear cuenta',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.acento,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+      ],
+    );
+  }
+
+  // Vista para Usuarios con cuenta
+  Widget _buildPerfilUsuario(BuildContext context, Color textoPrincipal, Color textoSecundario) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Mi Perfil',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
+        ),
+        const SizedBox(height: 16),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.acento.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.badge_outlined, color: AppColors.acento, size: 20),
+          ),
+          title: Text(
+            'Cambiar nombre',
+            style: TextStyle(color: textoPrincipal, fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          trailing: Icon(Icons.chevron_right_rounded, size: 20, color: textoSecundario),
+          onTap: () {
+            Navigator.pop(context);
+            // TODO: Acción para abrir formulario/dialog para cambiar nombre
+          },
+        ),
+        Divider(height: 1, thickness: 0.5, color: textoSecundario.withValues(alpha: 0.2)),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.acento.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.lock_outline_rounded, color: AppColors.acento, size: 20),
+          ),
+          title: Text(
+            'Cambiar contraseña',
+            style: TextStyle(color: textoPrincipal, fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          trailing: Icon(Icons.chevron_right_rounded, size: 20, color: textoSecundario),
+          onTap: () {
+            Navigator.pop(context);
+            // TODO: Acción para abrir formulario/dialog de contraseña
+          },
+        ),
+      ],
     );
   }
 
@@ -166,16 +415,15 @@ class AjustesScreen extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        final espacioAbajo = MediaQuery.of(context).padding.bottom;
         return Padding(
-          padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + espacioAbajo),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
               const SizedBox(height: 16),
               Text(
-                'Tribuna pro',
+                'Tribuna Pro',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
               ),
               const SizedBox(height: 4),
@@ -210,9 +458,8 @@ class AjustesScreen extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        final espacioAbajo = MediaQuery.of(context).padding.bottom;
         return Padding(
-          padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + espacioAbajo),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -231,7 +478,7 @@ class AjustesScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   5,
-                  (index) => Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
+                  (index) => const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
                 ),
               ),
               const SizedBox(height: 20),
