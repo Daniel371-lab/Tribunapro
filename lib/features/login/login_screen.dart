@@ -17,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
-  bool _aceptaTerminos = false;
   bool _cargando = false;
 
   @override
@@ -37,10 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _iniciarSesion() async {
-    if (!_aceptaTerminos) {
-      _mostrarMensaje('Debes aceptar los Términos y Condiciones para continuar.');
-      return;
-    }
     if (_emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) {
       _mostrarMensaje('Completa correo y contraseña.');
       return;
@@ -60,10 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _entrarComoInvitado() async {
-    if (!_aceptaTerminos) {
-      _mostrarMensaje('Debes aceptar los Términos y Condiciones para continuar.');
-      return;
-    }
     setState(() => _cargando = true);
     try {
       await _auth.iniciarSesionInvitado();
@@ -171,43 +162,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: textoSecundario),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Checkbox(
-                    value: _aceptaTerminos,
-                    activeColor: AppColors.acento,
-                    onChanged: (valor) => setState(() => _aceptaTerminos = valor ?? false),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => context.push('/terminos'),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 14),
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(fontSize: 12, color: textoSecundario),
-                            children: [
-                              const TextSpan(text: 'Acepto los '),
-                              TextSpan(
-                                text: 'Términos y Condiciones y la Política de Privacidad',
-                                style: TextStyle(
-                                  color: AppColors.acento,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                              const TextSpan(text: '.'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

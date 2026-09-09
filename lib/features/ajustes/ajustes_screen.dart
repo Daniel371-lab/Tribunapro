@@ -550,7 +550,7 @@ class AjustesScreen extends StatelessWidget {
     );
   }
 
-  // ==== VENTANA: Acerca de ====
+    // ==== VENTANA: Acerca de ====
 
   void _mostrarAcercaDe(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
@@ -578,21 +578,42 @@ class AjustesScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
-                const SizedBox(height: 16),
                 Text(
                   'Tribuna Pro',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textoPrincipal),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'Versión 1.0.0',
+                  'Desarrollado por JPLABS',
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: textoSecundario),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.acento.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Desarrollado por JPLABS',
-                  style: TextStyle(fontSize: 13, color: textoSecundario),
+                  'Versión 1.0.0',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.acento,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Entendido'),
+                  ),
                 ),
               ],
             ),
@@ -601,6 +622,7 @@ class AjustesScreen extends StatelessWidget {
       },
     );
   }
+
 
   // ==== VENTANA: Calificar la app ====
 

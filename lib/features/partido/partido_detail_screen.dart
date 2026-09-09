@@ -5,7 +5,7 @@ import '../dashboard/widgets/escudo_imagen.dart';
 
 class PartidoDetailScreen extends StatelessWidget {
   final Partido partido;
-  
+
   const PartidoDetailScreen({super.key, required this.partido});
 
   @override
@@ -60,6 +60,37 @@ class PartidoDetailScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
+                  // Datos del partido (jornada, árbitro, medio tiempo)
+                  if (partido.jornada != null || partido.arbitro != null || partido.medioTiempoLocal != null) ...[
+                    _buildSeccion(
+                      context,
+                      titulo: 'DATOS DEL PARTIDO',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (partido.jornada != null) ...[
+                            _filaDato('Jornada', partido.jornada.toString(), textoPrincipal, textoSecundario),
+                          ],
+                          if (partido.medioTiempoLocal != null && partido.medioTiempoVisitante != null) ...[
+                            if (partido.jornada != null) const Divider(height: 24, thickness: 0.5),
+                            _filaDato(
+                              'Medio tiempo',
+                              '${partido.medioTiempoLocal} - ${partido.medioTiempoVisitante}',
+                              textoPrincipal,
+                              textoSecundario,
+                            ),
+                          ],
+                          if (partido.arbitro != null) ...[
+                            if (partido.jornada != null || partido.medioTiempoLocal != null)
+                              const Divider(height: 24, thickness: 0.5),
+                            _filaDato('Árbitro', partido.arbitro!, textoPrincipal, textoSecundario),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Sección Resultado o Predicción
                   if (partido.finalizado) ...[
                     _buildSeccion(
@@ -108,7 +139,7 @@ class PartidoDetailScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    
+
                     if (partido.porcentajeLocal != null) ...[
                       const SizedBox(height: 16),
                       _buildSeccion(
@@ -126,7 +157,7 @@ class PartidoDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    
+
                     if (partido.consejo != null) ...[
                       const SizedBox(height: 16),
                       _buildSeccion(
@@ -158,6 +189,53 @@ class PartidoDetailScreen extends StatelessWidget {
                             Container(width: 1, height: 30, color: textoSecundario.withValues(alpha: 0.2)),
                           if (partido.tarjetas != null)
                             _probabilidad('Tarjetas', partido.tarjetas.toString(), textoPrincipal, textoSecundario),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (partido.posicionLocal != null || partido.posicionVisitante != null) ...[
+                    const SizedBox(height: 16),
+                    _buildSeccion(
+                      context,
+                      titulo: 'TABLA DE POSICIONES',
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _probabilidad(
+                            partido.equipoLocal,
+                            partido.posicionLocal != null ? '#${partido.posicionLocal}' : '-',
+                            textoPrincipal,
+                            textoSecundario,
+                          ),
+                          Container(width: 1, height: 30, color: textoSecundario.withValues(alpha: 0.2)),
+                          _probabilidad(
+                            partido.equipoVisitante,
+                            partido.posicionVisitante != null ? '#${partido.posicionVisitante}' : '-',
+                            textoPrincipal,
+                            textoSecundario,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (partido.goleadorLocal != null || partido.goleadorVisitante != null) ...[
+                    const SizedBox(height: 16),
+                    _buildSeccion(
+                      context,
+                      titulo: 'GOLEADORES DESTACADOS',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (partido.goleadorLocal != null) ...[
+                            _filaDato(partido.equipoLocal, partido.goleadorLocal!, textoPrincipal, textoSecundario),
+                          ],
+                          if (partido.goleadorLocal != null && partido.goleadorVisitante != null)
+                            const Divider(height: 24, thickness: 0.5),
+                          if (partido.goleadorVisitante != null) ...[
+                            _filaDato(partido.equipoVisitante, partido.goleadorVisitante!, textoPrincipal, textoSecundario),
+                          ],
                         ],
                       ),
                     ),
@@ -238,7 +316,7 @@ class PartidoDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Marcador / VS
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -277,11 +355,11 @@ class PartidoDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
           const Divider(height: 1, thickness: 0.5),
           const SizedBox(height: 16),
-          
+
           // Fecha
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

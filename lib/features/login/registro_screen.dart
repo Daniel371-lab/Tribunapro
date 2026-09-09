@@ -22,6 +22,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmarCtrl = TextEditingController();
 
+  bool _aceptaTerminos = false;
   bool _cargando = false;
 
   static final _regexPassword = RegExp(r'^(?=.*[A-Z])[A-Za-z0-9]{7,15}$');
@@ -75,6 +76,11 @@ class _RegistroScreenState extends State<RegistroScreen> {
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!_aceptaTerminos) {
+      _mostrarMensaje('Debes aceptar los Términos y Condiciones para continuar.');
+      return;
+    }
+
     setState(() => _cargando = true);
     try {
       await _auth.registrarConEmail(
@@ -95,6 +101,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Crear cuenta')),
@@ -153,7 +160,44 @@ class _RegistroScreenState extends State<RegistroScreen> {
                   validator: _validarConfirmacion,
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Checkbox(
+                      value: _aceptaTerminos,
+                      activeColor: AppColors.acento,
+                      onChanged: (valor) => setState(() => _aceptaTerminos = valor ?? false),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => context.push('/terminos'),
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: RichText(
+                            text: TextSpan(
+                              style: TextStyle(fontSize: 12, color: textoSecundario),
+                              children: [
+                                const TextSpan(text: 'Acepto los '),
+                                TextSpan(
+                                  text: 'Términos y Condiciones y la Política de Privacidad',
+                                  style: TextStyle(
+                                    color: AppColors.acento,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                                const TextSpan(text: '.'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
                 FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.acento,

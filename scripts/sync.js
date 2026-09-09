@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { obtenerPartidos, obtenerHeadToHead, obtenerTabla } = require("./footballData");
+const { obtenerPartidos, obtenerHeadToHead, obtenerTabla, obtenerGoleadores } = require("./footballData");
 const { esCompetenciaValida, datosCompetencia } = require("./competencias");
 const { calcularPrediccion } = require("./prediccion");
 
@@ -17,6 +17,7 @@ admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
 const tablasCache = {};
+const goleadoresCache = {};
 
 function formatearFecha(date) {
   return date.toISOString().split("T")[0];
@@ -35,6 +36,19 @@ async function obtenerTablaCacheada(codigo) {
   }
 }
 
+async function obtenerGoleadoresCacheados(codigo) {
+  if (goleadoresCache[codigo] !== undefined) return goleadoresCache[codigo];
+  try {
+    const goleadores = await obtenerGoleadores(codigo);
+    goleadoresCache[codigo] = goleadores;
+    return goleadores;
+  } catch (err) {
+    console.error(`No se pudo traer goleadores de ${codigo}:`, err.message);
+    goleadoresCache[codigo] = null;
+    return null;
+  }
+}
+
 function datosDeEquipoEnTabla(tabla, equipoId) {
   if (!tabla || !tabla.standings) return null;
   const grupoTotal = tabla.standings.find((s) => s.type === "TOTAL");
@@ -42,6 +56,20 @@ function datosDeEquipoEnTabla(tabla, equipoId) {
   const fila = grupoTotal.table.find((f) => f.team.id === equipoId);
   if (!fila) return null;
   return { posicion: fila.position, forma: fila.form, totalEquipos: grupoTotal.table.length };
+}
+
+function goleadorDeEquipo(goleadores, equipoId) {
+  if (!goleadores || !goleadores.scorers) return null;
+  const entrada = goleadores.scorers.find((s) => s.team.id === equipoId);
+  if (!entrada) return null;
+  const goles = entrada.goals ?? 0;
+  return `${entrada.player.name} (${goles} ${goles === 1 ? "gol" : "goles"})`;
+}
+
+function arbitroDelPartido(match) {
+  if (!match.referees || match.referees.length === 0) return null;
+  const principal = match.referees.find((r) => r.type === "REFEREE") || match.referees[0];
+  return principal?.name ?? null;
 }
 
 async function armarPrediccion(match) {
@@ -75,9 +103,28 @@ async function armarPrediccion(match) {
   return { prediccion, h2hTexto };
 }
 
+async function datosExtraDelPartido(match) {
+  const tabla = await obtenerTablaCacheada(match.competition.code);
+  const goleadores = await obtenerGoleadoresCacheados(match.competition.code);
+
+  const datosLocal = datosDeEquipoEnTabla(tabla, match.homeTeam.id);
+  const datosVisitante = datosDeEquipoEnTabla(tabla, match.awayTeam.id);
+
+  return {
+    jornada: match.matchday ?? null,
+    arbitro: arbitroDelPartido(match),
+    medioTiempoLocal: match.score?.halfTime?.home ?? null,
+    medioTiempoVisitante: match.score?.halfTime?.away ?? null,
+    posicionLocal: datosLocal?.posicion ?? null,
+    posicionVisitante: datosVisitante?.posicion ?? null,
+    goleadorLocal: goleadorDeEquipo(goleadores, match.homeTeam.id),
+    goleadorVisitante: goleadorDeEquipo(goleadores, match.awayTeam.id),
+  };
+}
+
 async function procesarPartidos(matches) {
   let nuevos = 0;
-  let actualizadosEscudos = 0;
+  let actualizadosExtra = 0;
 
   for (const match of matches) {
     if (!esCompetenciaValida(match)) continue;
@@ -88,6 +135,7 @@ async function procesarPartidos(matches) {
 
     const escudoLocal = match.homeTeam.crest || null;
     const escudoVisitante = match.awayTeam.crest || null;
+    const extra = await datosExtraDelPartido(match);
 
     if (!doc.exists) {
       const { prediccion, h2hTexto } = await armarPrediccion(match);
@@ -113,18 +161,21 @@ async function procesarPartidos(matches) {
         finalizado: false,
         resultado: null,
         acertado: null,
+        ...extra,
       });
       nuevos++;
     } else {
-      // Asegura actualizar los escudos en partidos que ya estaban creados
+      // Actualiza escudos y los datos extra (posición, goleador, medio tiempo, etc.)
+      // en partidos que ya existían, sin tocar la predicción original.
       await ref.set({
         escudoLocal,
         escudoVisitante,
+        ...extra,
       }, { merge: true });
-      actualizadosEscudos++;
+      actualizadosExtra++;
     }
   }
-  return { nuevos, actualizadosEscudos };
+  return { nuevos, actualizadosExtra };
 }
 
 async function actualizarResultados(matches) {
@@ -152,6 +203,8 @@ async function actualizarResultados(matches) {
       acertado: acerto,
       escudoLocal: match.homeTeam.crest || null,
       escudoVisitante: match.awayTeam.crest || null,
+      medioTiempoLocal: match.score?.halfTime?.home ?? null,
+      medioTiempoVisitante: match.score?.halfTime?.away ?? null,
     });
     actualizados++;
   }
@@ -188,10 +241,10 @@ async function main() {
   console.log(`Total partidos recibidos: ${partidos.length}`);
 
   const actualizadosResultados = await actualizarResultados(partidos);
-  const { nuevos, actualizadosEscudos } = await procesarPartidos(partidos);
+  const { nuevos, actualizadosExtra } = await procesarPartidos(partidos);
   const borrados = await purgarVencidos();
 
-  console.log(`Nuevos: ${nuevos} | Escudos sincronizados en existentes: ${actualizadosEscudos} | Resultados actualizados: ${actualizadosResultados} | Purgados: ${borrados}`);
+  console.log(`Nuevos: ${nuevos} | Actualizados con datos extra: ${actualizadosExtra} | Resultados actualizados: ${actualizadosResultados} | Purgados: ${borrados}`);
 }
 
 main()
