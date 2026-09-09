@@ -166,8 +166,9 @@ class AjustesScreen extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final espacioAbajo = MediaQuery.of(context).padding.bottom;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + espacioAbajo),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -209,8 +210,9 @@ class AjustesScreen extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final espacioAbajo = MediaQuery.of(context).padding.bottom;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + espacioAbajo),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -8,6 +10,25 @@ import '../../features/favoritos/favoritos_screen.dart';
 import '../../features/historial/historial_screen.dart';
 import '../../features/ajustes/ajustes_screen.dart';
 import '../../features/partido/partido_detail_screen.dart';
+import '../../features/splash/splash_screen.dart';
+import '../../features/login/login_screen.dart';
+import '../../features/login/registro_screen.dart';
+import '../../features/login/terminos_screen.dart';
+
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -15,8 +36,42 @@ class AppRouter {
 
   static final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/',
+    initialLocation: '/splash',
+    refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
+    redirect: (context, state) {
+      final enSplash = state.matchedLocation == '/splash';
+      final enLogin = state.matchedLocation == '/login';
+      final enRegistro = state.matchedLocation == '/registro';
+      final enTerminos = state.matchedLocation == '/terminos';
+      final logueado = FirebaseAuth.instance.currentUser != null;
+
+      if (enSplash) return null;
+      if (enTerminos) return null; // se puede leer sin estar logueado
+      if (!logueado && !enLogin && !enRegistro) return '/login';
+      if (logueado && (enLogin || enRegistro)) return '/';
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/splash',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/registro',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const RegistroScreen(),
+      ),
+      GoRoute(
+        path: '/terminos',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const TerminosScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => _AppShell(navigationShell: navigationShell),
         branches: [
