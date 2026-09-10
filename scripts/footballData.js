@@ -23,10 +23,6 @@ async function llamar(ruta, params, contexto) {
   }
 }
 
-async function obtenerGoleadores(competicionCodigo) {
-  return llamar(`/competitions/${competicionCodigo}/scorers`, { limit: 20 }, `scorers ${competicionCodigo}`);
-}
-
 async function obtenerPartidos(dateFrom, dateTo) {
   const data = await llamar("/matches", { dateFrom, dateTo }, `matches ${dateFrom}→${dateTo}`);
   return data.matches || [];
@@ -40,4 +36,4 @@ async function obtenerTabla(competicionCodigo) {
   return llamar(`/competitions/${competicionCodigo}/standings`, {}, `standings ${competicionCodigo}`);
 }
 
-module.exports = { obtenerPartidos, obtenerHeadToHead, obtenerTabla, obtenerGoleadores };
+module.exports = { obtenerPartidos, obtenerHeadToHead, obtenerTabla };

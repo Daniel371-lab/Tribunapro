@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { obtenerPartidos, obtenerHeadToHead, obtenerTabla, obtenerGoleadores } = require("./footballData");
+const { obtenerPartidos, obtenerHeadToHead, obtenerTabla } = require("./footballData");
 const { esCompetenciaValida, datosCompetencia } = require("./competencias");
 const { calcularPrediccion } = require("./prediccion");
 
@@ -17,7 +17,6 @@ admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
 const tablasCache = {};
-const goleadoresCache = {};
 
 function formatearFecha(date) {
   return date.toISOString().split("T")[0];
@@ -36,40 +35,25 @@ async function obtenerTablaCacheada(codigo) {
   }
 }
 
-async function obtenerGoleadoresCacheados(codigo) {
-  if (goleadoresCache[codigo] !== undefined) return goleadoresCache[codigo];
-  try {
-    const goleadores = await obtenerGoleadores(codigo);
-    goleadoresCache[codigo] = goleadores;
-    return goleadores;
-  } catch (err) {
-    console.error(`No se pudo traer goleadores de ${codigo}:`, err.message);
-    goleadoresCache[codigo] = null;
-    return null;
-  }
-}
-
-function datosDeEquipoEnTabla(tabla, equipoId) {
+function statsDeEquipoEnTabla(tabla, equipoId) {
   if (!tabla || !tabla.standings) return null;
   const grupoTotal = tabla.standings.find((s) => s.type === "TOTAL");
   if (!grupoTotal) return null;
   const fila = grupoTotal.table.find((f) => f.team.id === equipoId);
   if (!fila) return null;
-  return { posicion: fila.position, forma: fila.form, totalEquipos: grupoTotal.table.length };
-}
-
-function goleadorDeEquipo(goleadores, equipoId) {
-  if (!goleadores || !goleadores.scorers) return null;
-  const entrada = goleadores.scorers.find((s) => s.team.id === equipoId);
-  if (!entrada) return null;
-  const goles = entrada.goals ?? 0;
-  return `${entrada.player.name} (${goles} ${goles === 1 ? "gol" : "goles"})`;
-}
-
-function arbitroDelPartido(match) {
-  if (!match.referees || match.referees.length === 0) return null;
-  const principal = match.referees.find((r) => r.type === "REFEREE") || match.referees[0];
-  return principal?.name ?? null;
+  return {
+    posicion: fila.position,
+    puntos: fila.points,
+    partidosJugados: fila.playedGames,
+    ganados: fila.won,
+    empatados: fila.draw,
+    perdidos: fila.lost,
+    golesFavor: fila.goalsFor,
+    golesContra: fila.goalsAgainst,
+    diferenciaGol: fila.goalDifference,
+    forma: fila.form,
+    totalEquipos: grupoTotal.table.length,
+  };
 }
 
 async function armarPrediccion(match) {
@@ -81,44 +65,59 @@ async function armarPrediccion(match) {
   }
 
   const tabla = await obtenerTablaCacheada(match.competition.code);
-  const datosLocal = datosDeEquipoEnTabla(tabla, match.homeTeam.id);
-  const datosVisitante = datosDeEquipoEnTabla(tabla, match.awayTeam.id);
+  const statsLocal = statsDeEquipoEnTabla(tabla, match.homeTeam.id);
+  const statsVisitante = statsDeEquipoEnTabla(tabla, match.awayTeam.id);
 
   const prediccion = calcularPrediccion({
     h2h,
     idLocal: match.homeTeam.id,
-    formaLocal: datosLocal?.forma,
-    formaVisitante: datosVisitante?.forma,
-    posicionLocal: datosLocal?.posicion,
-    posicionVisitante: datosVisitante?.posicion,
-    totalEquipos: datosLocal?.totalEquipos,
+    formaLocal: statsLocal?.forma,
+    formaVisitante: statsVisitante?.forma,
+    posicionLocal: statsLocal?.posicion,
+    posicionVisitante: statsVisitante?.posicion,
+    totalEquipos: statsLocal?.totalEquipos,
     nombreLocal: match.homeTeam.name,
     nombreVisitante: match.awayTeam.name,
   });
 
-  const h2hTexto = (h2h?.matches ?? [])
+  const h2hDatos = (h2h?.matches ?? [])
     .slice(0, 5)
-    .map((p) => `${p.homeTeam.name} ${p.score.fullTime.home}-${p.score.fullTime.away} ${p.awayTeam.name}`);
+    .map((p) => ({
+      equipoLocal: p.homeTeam.name,
+      golesLocal: p.score.fullTime.home,
+      equipoVisitante: p.awayTeam.name,
+      golesVisitante: p.score.fullTime.away,
+    }));
 
-  return { prediccion, h2hTexto };
+  return { prediccion, h2hDatos };
+}
+
+function statsParaGuardar(stats) {
+  if (!stats) return null;
+  return {
+    posicion: stats.posicion,
+    puntos: stats.puntos,
+    partidosJugados: stats.partidosJugados,
+    ganados: stats.ganados,
+    empatados: stats.empatados,
+    perdidos: stats.perdidos,
+    golesFavor: stats.golesFavor,
+    golesContra: stats.golesContra,
+    diferenciaGol: stats.diferenciaGol,
+  };
 }
 
 async function datosExtraDelPartido(match) {
   const tabla = await obtenerTablaCacheada(match.competition.code);
-  const goleadores = await obtenerGoleadoresCacheados(match.competition.code);
-
-  const datosLocal = datosDeEquipoEnTabla(tabla, match.homeTeam.id);
-  const datosVisitante = datosDeEquipoEnTabla(tabla, match.awayTeam.id);
+  const statsLocal = statsDeEquipoEnTabla(tabla, match.homeTeam.id);
+  const statsVisitante = statsDeEquipoEnTabla(tabla, match.awayTeam.id);
 
   return {
     jornada: match.matchday ?? null,
-    arbitro: arbitroDelPartido(match),
     medioTiempoLocal: match.score?.halfTime?.home ?? null,
     medioTiempoVisitante: match.score?.halfTime?.away ?? null,
-    posicionLocal: datosLocal?.posicion ?? null,
-    posicionVisitante: datosVisitante?.posicion ?? null,
-    goleadorLocal: goleadorDeEquipo(goleadores, match.homeTeam.id),
-    goleadorVisitante: goleadorDeEquipo(goleadores, match.awayTeam.id),
+    statsLocal: statsParaGuardar(statsLocal),
+    statsVisitante: statsParaGuardar(statsVisitante),
   };
 }
 
@@ -138,7 +137,7 @@ async function procesarPartidos(matches) {
     const extra = await datosExtraDelPartido(match);
 
     if (!doc.exists) {
-      const { prediccion, h2hTexto } = await armarPrediccion(match);
+      const { prediccion, h2hDatos } = await armarPrediccion(match);
       const { nombre, tipo } = datosCompetencia(match.competition.code);
 
       await ref.set({
@@ -156,7 +155,7 @@ async function procesarPartidos(matches) {
         porcentajeEmpate: prediccion.porcentajeEmpate,
         porcentajeVisitante: prediccion.porcentajeVisitante,
         consejo: prediccion.consejo,
-        h2h: h2hTexto.length > 0 ? h2hTexto : null,
+        h2h: h2hDatos.length > 0 ? h2hDatos : null,
         esPro: false,
         finalizado: false,
         resultado: null,
@@ -165,8 +164,8 @@ async function procesarPartidos(matches) {
       });
       nuevos++;
     } else {
-      // Actualiza escudos y los datos extra (posición, goleador, medio tiempo, etc.)
-      // en partidos que ya existían, sin tocar la predicción original.
+      // Actualiza escudos y los datos extra (posición, stats, medio tiempo, etc.)
+      // en partidos que ya existían, sin tocar la predicción ni el h2h original.
       await ref.set({
         escudoLocal,
         escudoVisitante,
