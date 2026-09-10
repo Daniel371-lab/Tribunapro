@@ -211,6 +211,15 @@ function calcularPrediccion({
     });
   }
 
+  /// Si ya dijimos "Gana X" en la categoría de Resultado, no tiene sentido
+  // repetir "X va a marcar" por separado — va implícito en que ganó.
+  const yaGanaLocal = predicciones.some(
+    (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "local"
+  );
+  const yaGanaVisitante = predicciones.some(
+    (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "visitante"
+  );
+
   // Categoría: Ambos marcan / marca un equipo puntual
   if (probBTTS >= 65) {
     predicciones.push({
@@ -219,14 +228,14 @@ function calcularPrediccion({
       criterio: {},
     });
   } else {
-    if (probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3) {
+    if (!yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3) {
       predicciones.push({
         tipo: "gol_equipo",
         texto: `${nombreLocal} va a marcar`,
         criterio: { equipo: "local" },
       });
     }
-    if (probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3) {
+    if (!yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3) {
       predicciones.push({
         tipo: "gol_equipo",
         texto: `${nombreVisitante} va a marcar`,
