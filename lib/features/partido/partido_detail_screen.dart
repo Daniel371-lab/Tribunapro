@@ -34,9 +34,9 @@ class PartidoDetailScreen extends StatelessWidget {
                     child: Text(
                       partido.competenciaNombre,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
+                        letterSpacing: -0.5,
                         color: textoPrincipal,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -54,88 +54,60 @@ class PartidoDetailScreen extends StatelessWidget {
                   _buildMarcadorCard(context),
 
                   if (partido.medioTiempoLocal != null && partido.medioTiempoVisitante != null) ...[
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
                     _buildSeccion(
                       context,
                       titulo: 'Medio tiempo',
-                      icono: Icons.timelapse_rounded,
                       child: Center(
                         child: Text(
                           '${partido.medioTiempoLocal} - ${partido.medioTiempoVisitante}',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: textoPrincipal),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textoPrincipal),
                         ),
                       ),
                     ),
                   ],
 
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 20),
 
                   if (partido.finalizado) ...[
                     _buildSeccion(
                       context,
                       titulo: 'Resultado de la predicción',
-                      icono: Icons.fact_check_rounded,
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: ((partido.acertado ?? false) ? AppColors.acento : AppColors.error).withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               (partido.acertado ?? false) ? Icons.check_circle_rounded : Icons.cancel_rounded,
                               color: (partido.acertado ?? false) ? AppColors.acento : AppColors.error,
-                              size: 26,
+                              size: 22,
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               (partido.acertado ?? false) ? 'La predicción fue correcta' : 'La predicción no acertó',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textoPrincipal),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ] else if (partido.prediccionGanador != null) ...[
-                    _buildSeccion(
-                      context,
-                      titulo: 'Nuestra predicción',
-                      icono: Icons.auto_awesome_rounded,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _filaDato('Ganador sugerido', partido.prediccionGanador!, textoPrincipal, textoSecundario),
-                          if (partido.prediccionGoles != null) ...[
-                            const SizedBox(height: 12),
-                            _filaDato('Total de goles', partido.prediccionGoles!, textoPrincipal, textoSecundario),
-                          ],
-                        ],
-                      ),
-                    ),
+                    _buildTituloSeccion(context, 'Nuestra predicción'),
+                    const SizedBox(height: 10),
+                    ..._construirCardsPrediccion(context),
 
                     if (partido.porcentajeLocal != null) ...[
                       const SizedBox(height: 18),
                       _buildSeccion(
                         context,
                         titulo: 'Probabilidades',
-                        icono: Icons.pie_chart_rounded,
                         child: _buildBarraProbabilidad(context),
-                      ),
-                    ],
-
-                    if (partido.consejo != null) ...[
-                      const SizedBox(height: 18),
-                      _buildSeccion(
-                        context,
-                        titulo: 'Análisis táctico',
-                        icono: Icons.psychology_alt_rounded,
-                        child: Text(
-                          partido.consejo!,
-                          style: TextStyle(fontSize: 14, height: 1.6, color: textoPrincipal.withValues(alpha: 0.92)),
-                        ),
                       ),
                     ],
                   ],
@@ -145,7 +117,6 @@ class PartidoDetailScreen extends StatelessWidget {
                     _buildSeccion(
                       context,
                       titulo: 'Corners y tarjetas',
-                      icono: Icons.style_rounded,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -164,14 +135,13 @@ class PartidoDetailScreen extends StatelessWidget {
                     _buildSeccion(
                       context,
                       titulo: 'Estadísticas de temporada',
-                      icono: Icons.leaderboard_rounded,
                       child: _buildTablaComparativa(context),
                     ),
                   ],
 
                   if (partido.h2h != null && partido.h2h!.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    _buildTituloSeccion(context, 'Enfrentamientos anteriores', Icons.history_rounded),
+                    _buildTituloSeccion(context, 'Enfrentamientos anteriores'),
                     const SizedBox(height: 10),
                     Column(
                       children: partido.h2h!.map((e) => _buildFilaH2H(context, e)).toList(),
@@ -186,11 +156,80 @@ class PartidoDetailScreen extends StatelessWidget {
     );
   }
 
+  // Devuelve una card por cada "predicción" disponible. Hoy hay una sola
+  // (ganador + análisis combinados), pero la lista está lista para crecer
+  // el día que se sumen más tipos de pronóstico (goles, ambos anotan, etc.)
+  // sin tener que rediseñar la sección.
+  List<Widget> _construirCardsPrediccion(BuildContext context) {
+    final predicciones = <Widget>[];
+
+    predicciones.add(_prediccionCard(
+      context,
+      etiqueta: 'Ganador sugerido',
+      valor: partido.prediccionGanador!,
+      analisis: partido.consejo,
+    ));
+
+    if (partido.prediccionGoles != null) {
+      predicciones.add(_prediccionCard(
+        context,
+        etiqueta: 'Total de goles',
+        valor: partido.prediccionGoles!,
+      ));
+    }
+
+    return predicciones;
+  }
+
+  Widget _prediccionCard(
+    BuildContext context, {
+    required String etiqueta,
+    required String valor,
+    String? analisis,
+  }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [_sombra(esOscuro)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(etiqueta, style: TextStyle(fontSize: 13, color: textoSecundario)),
+              Text(valor, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textoPrincipal)),
+            ],
+          ),
+          if (analisis != null) ...[
+            const SizedBox(height: 10),
+            Divider(height: 1, thickness: 0.5, color: textoSecundario.withValues(alpha: 0.15)),
+            const SizedBox(height: 10),
+            Text(
+              analisis,
+              style: TextStyle(fontSize: 13, height: 1.5, color: textoPrincipal.withValues(alpha: 0.85)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   BoxShadow _sombra(bool esOscuro) {
     return BoxShadow(
-      color: (esOscuro ? Colors.black : const Color(0xFF1A1A1A)).withValues(alpha: esOscuro ? 0.45 : 0.07),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
+      color: (esOscuro ? Colors.black : const Color(0xFF1A1A1A)).withValues(alpha: esOscuro ? 0.4 : 0.06),
+      blurRadius: 16,
+      offset: const Offset(0, 6),
     );
   }
 
@@ -208,34 +247,34 @@ class PartidoDetailScreen extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: esOscuro
-              ? [acentoActual.withValues(alpha: 0.22), superficie]
-              : [acentoActual.withValues(alpha: 0.16), Colors.white],
+              ? [acentoActual.withValues(alpha: 0.2), superficie]
+              : [acentoActual.withValues(alpha: 0.14), Colors.white],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [_sombra(esOscuro)],
       ),
       child: Column(
         children: [
           if (partido.jornada != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
                     color: acentoActual,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     'JORNADA ${partido.jornada}',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: Colors.white),
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: Colors.white),
                   ),
                 ),
               ),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
             child: Column(
               children: [
                 Row(
@@ -244,24 +283,25 @@ class PartidoDetailScreen extends StatelessWidget {
                     Expanded(
                       child: Column(
                         children: [
-                          EscudoImagen(url: partido.escudoLocal ?? '', size: 60),
-                          const SizedBox(height: 14),
+                          EscudoImagen(url: partido.escudoLocal ?? '', size: 42),
+                          const SizedBox(height: 8),
                           Text(
                             partido.equipoLocal,
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textoPrincipal),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textoPrincipal),
                           ),
                         ],
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text(
                         partido.finalizado ? (partido.resultado ?? '-') : 'VS',
                         style: TextStyle(
-                          fontSize: partido.finalizado ? 32 : 22,
+                          fontSize: partido.finalizado ? 22 : 16,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
                           color: partido.finalizado ? acentoActual : textoSecundario,
                         ),
                       ),
@@ -269,27 +309,29 @@ class PartidoDetailScreen extends StatelessWidget {
                     Expanded(
                       child: Column(
                         children: [
-                          EscudoImagen(url: partido.escudoVisitante ?? '', size: 60),
-                          const SizedBox(height: 14),
+                          EscudoImagen(url: partido.escudoVisitante ?? '', size: 42),
+                          const SizedBox(height: 8),
                           Text(
                             partido.equipoVisitante,
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textoPrincipal),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textoPrincipal),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 14, color: textoSecundario),
-                    const SizedBox(width: 6),
+                    Icon(Icons.calendar_today_rounded, size: 12, color: textoSecundario),
+                    const SizedBox(width: 5),
                     Text(
                       _formatearFechaCompleta(partido.fecha),
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textoSecundario),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textoSecundario),
                     ),
                   ],
                 ),
@@ -314,9 +356,9 @@ class PartidoDetailScreen extends StatelessWidget {
     return Column(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           child: SizedBox(
-            height: 14,
+            height: 12,
             child: Row(
               children: [
                 Expanded(flex: (local * 10).round().clamp(1, 1000), child: Container(color: acentoActual)),
@@ -326,7 +368,7 @@ class PartidoDetailScreen extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -344,15 +386,15 @@ class PartidoDetailScreen extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
             const SizedBox(width: 5),
-            Text(valor, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: colorPrincipal)),
+            Text(valor, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: colorPrincipal)),
           ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
         Text(
           etiqueta.toUpperCase(),
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1, color: colorSecundario),
+          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colorSecundario),
         ),
       ],
     );
@@ -366,18 +408,18 @@ class PartidoDetailScreen extends StatelessWidget {
   Widget _statChip(String etiqueta, String valor, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            Text(valor, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
-            const SizedBox(height: 4),
+            Text(valor, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+            const SizedBox(height: 3),
             Text(
               etiqueta.toUpperCase(),
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1, color: color.withValues(alpha: 0.85)),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: color.withValues(alpha: 0.85)),
             ),
           ],
         ),
@@ -411,11 +453,11 @@ class PartidoDetailScreen extends StatelessWidget {
         final (etiqueta, valorLocal, valorVisitante) = filas[index];
         final destacada = index.isEven;
         return Container(
-          margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
             color: destacada ? acentoActual.withValues(alpha: 0.06) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
@@ -423,7 +465,7 @@ class PartidoDetailScreen extends StatelessWidget {
                 child: Text(
                   _formatearValor(etiqueta, valorLocal),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
                 ),
               ),
               Expanded(
@@ -431,14 +473,14 @@ class PartidoDetailScreen extends StatelessWidget {
                 child: Text(
                   etiqueta.toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.4, color: textoSecundario),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.3, color: textoSecundario),
                 ),
               ),
               Expanded(
                 child: Text(
                   _formatearValor(etiqueta, valorVisitante),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
                 ),
               ),
             ],
@@ -461,11 +503,11 @@ class PartidoDetailScreen extends StatelessWidget {
     final acentoActual = esOscuro ? AppColors.acentoOscuro : AppColors.acento;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [_sombra(esOscuro)],
       ),
       child: Row(
@@ -473,27 +515,27 @@ class PartidoDetailScreen extends StatelessWidget {
           Expanded(
             child: Text(
               enfrentamiento.equipoLocal,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textoPrincipal),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textoPrincipal),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: acentoActual,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${enfrentamiento.golesLocal} - ${enfrentamiento.golesVisitante}',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
             ),
           ),
           Expanded(
             child: Text(
               enfrentamiento.equipoVisitante,
               textAlign: TextAlign.end,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textoPrincipal),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textoPrincipal),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -502,52 +544,35 @@ class PartidoDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTituloSeccion(BuildContext context, String titulo, IconData icono) {
+  Widget _buildTituloSeccion(BuildContext context, String titulo) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
-    final acentoActual = esOscuro ? AppColors.acentoOscuro : AppColors.acento;
 
-    return Row(
-      children: [
-        Icon(icono, size: 16, color: acentoActual),
-        const SizedBox(width: 8),
-        Text(
-          titulo,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: -0.2, color: textoPrincipal),
-        ),
-      ],
+    return Text(
+      titulo,
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: -0.2, color: textoPrincipal),
     );
   }
 
-  Widget _buildSeccion(BuildContext context, {required String titulo, required IconData icono, required Widget child}) {
+  Widget _buildSeccion(BuildContext context, {required String titulo, required Widget child}) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTituloSeccion(context, titulo, icono),
+        _buildTituloSeccion(context, titulo),
         const SizedBox(height: 10),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: superficie,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [_sombra(esOscuro)],
           ),
           child: child,
         ),
-      ],
-    );
-  }
-
-  Widget _filaDato(String etiqueta, String valor, Color colorPrincipal, Color colorSecundario) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(etiqueta, style: TextStyle(fontSize: 14, color: colorSecundario)),
-        Text(valor, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: colorPrincipal)),
       ],
     );
   }
