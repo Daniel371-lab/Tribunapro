@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const { obtenerPartidos, obtenerHeadToHead, obtenerTabla } = require("./footballData");
 const { esCompetenciaValida, datosCompetencia } = require("./competencias");
-const { calcularPrediccion } = require("./prediccion");
+const { calcularPrediccion, evaluarPrediccion } = require("./prediccion");
 
 let serviceAccount;
 try {
@@ -56,7 +56,22 @@ function statsDeEquipoEnTabla(tabla, equipoId) {
   };
 }
 
-async function armarPrediccion(match) {
+function statsParaGuardar(stats) {
+  if (!stats) return null;
+  return {
+    posicion: stats.posicion,
+    puntos: stats.puntos,
+    partidosJugados: stats.partidosJugados,
+    ganados: stats.ganados,
+    empatados: stats.empatados,
+    perdidos: stats.perdidos,
+    golesFavor: stats.golesFavor,
+    golesContra: stats.golesContra,
+    diferenciaGol: stats.diferenciaGol,
+  };
+}
+
+async function datosDelPartido(match) {
   let h2h = null;
   try {
     h2h = await obtenerHeadToHead(match.id);
@@ -78,6 +93,8 @@ async function armarPrediccion(match) {
     totalEquipos: statsLocal?.totalEquipos,
     nombreLocal: match.homeTeam.name,
     nombreVisitante: match.awayTeam.name,
+    statsLocal,
+    statsVisitante,
   });
 
   const h2hDatos = (h2h?.matches ?? [])
@@ -89,35 +106,18 @@ async function armarPrediccion(match) {
       golesVisitante: p.score.fullTime.away,
     }));
 
-  return { prediccion, h2hDatos };
-}
-
-function statsParaGuardar(stats) {
-  if (!stats) return null;
-  return {
-    posicion: stats.posicion,
-    puntos: stats.puntos,
-    partidosJugados: stats.partidosJugados,
-    ganados: stats.ganados,
-    empatados: stats.empatados,
-    perdidos: stats.perdidos,
-    golesFavor: stats.golesFavor,
-    golesContra: stats.golesContra,
-    diferenciaGol: stats.diferenciaGol,
-  };
-}
-
-async function datosExtraDelPartido(match) {
-  const tabla = await obtenerTablaCacheada(match.competition.code);
-  const statsLocal = statsDeEquipoEnTabla(tabla, match.homeTeam.id);
-  const statsVisitante = statsDeEquipoEnTabla(tabla, match.awayTeam.id);
-
   return {
     jornada: match.matchday ?? null,
     medioTiempoLocal: match.score?.halfTime?.home ?? null,
     medioTiempoVisitante: match.score?.halfTime?.away ?? null,
     statsLocal: statsParaGuardar(statsLocal),
     statsVisitante: statsParaGuardar(statsVisitante),
+    porcentajeLocal: prediccion.porcentajeLocal,
+    porcentajeEmpate: prediccion.porcentajeEmpate,
+    porcentajeVisitante: prediccion.porcentajeVisitante,
+    predicciones: prediccion.predicciones.map((p) => ({ ...p, cumplida: null })),
+    muestraChica: prediccion.muestraChica,
+    h2h: h2hDatos.length > 0 ? h2hDatos : null,
   };
 }
 
@@ -134,10 +134,9 @@ async function procesarPartidos(matches) {
 
     const escudoLocal = match.homeTeam.crest || null;
     const escudoVisitante = match.awayTeam.crest || null;
-    const extra = await datosExtraDelPartido(match);
 
     if (!doc.exists) {
-      const { prediccion, h2hDatos } = await armarPrediccion(match);
+      const datos = await datosDelPartido(match);
       const { nombre, tipo } = datosCompetencia(match.competition.code);
 
       await ref.set({
@@ -149,29 +148,21 @@ async function procesarPartidos(matches) {
         equipoVisitante: match.awayTeam.name,
         escudoVisitante,
         fecha: match.utcDate,
-        prediccionGanador: prediccion.ganador,
-        prediccionGoles: null,
-        porcentajeLocal: prediccion.porcentajeLocal,
-        porcentajeEmpate: prediccion.porcentajeEmpate,
-        porcentajeVisitante: prediccion.porcentajeVisitante,
-        consejo: prediccion.consejo,
-        h2h: h2hDatos.length > 0 ? h2hDatos : null,
         esPro: false,
         finalizado: false,
         resultado: null,
-        acertado: null,
-        ...extra,
+        ...datos,
       });
       nuevos++;
-    } else {
-      // Actualiza escudos y los datos extra (posición, stats, medio tiempo, etc.)
-      // en partidos que ya existían, sin tocar la predicción ni el h2h original.
-      await ref.set({
-        escudoLocal,
-        escudoVisitante,
-        ...extra,
-      }, { merge: true });
+    } else if (!doc.data().finalizado) {
+      // Solo se re-sincronizan datos extra (posición, medio tiempo, escudos)
+      // en partidos que todavía no terminaron. Un partido finalizado no
+      // debería cambiar sus predicciones/stats retroactivamente.
+      const datos = await datosDelPartido(match);
+      await ref.set({ escudoLocal, escudoVisitante, ...datos }, { merge: true });
       actualizadosExtra++;
+    } else {
+      await ref.set({ escudoLocal, escudoVisitante }, { merge: true });
     }
   }
   return { nuevos, actualizadosExtra };
@@ -189,17 +180,18 @@ async function actualizarResultados(matches) {
 
     const golesLocal = match.score.fullTime.home;
     const golesVisitante = match.score.fullTime.away;
-    const ganadorReal =
-      golesLocal > golesVisitante ? match.homeTeam.name
-      : golesVisitante > golesLocal ? match.awayTeam.name
-      : "Empate";
+    const resultadoReal =
+      golesLocal > golesVisitante ? "local" : golesVisitante > golesLocal ? "visitante" : "empate";
 
-    const acerto = doc.data().prediccionGanador === ganadorReal;
+    const predicciones = (doc.data().predicciones || []).map((p) => ({
+      ...p,
+      cumplida: evaluarPrediccion(p, { resultadoReal, golesLocal, golesVisitante }),
+    }));
 
     await ref.update({
       finalizado: true,
       resultado: `${golesLocal}-${golesVisitante}`,
-      acertado: acerto,
+      predicciones,
       escudoLocal: match.homeTeam.crest || null,
       escudoVisitante: match.awayTeam.crest || null,
       medioTiempoLocal: match.score?.halfTime?.home ?? null,

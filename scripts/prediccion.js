@@ -8,10 +8,18 @@ const BASE_EMPATE = 26;
 const BASE_VISITANTE = 34;
 
 const UMBRAL_EMPATE_TECNICO = 8;
-const PROMEDIO_GOLES_LIGA = 1.35; // Promedio estándar de goles por equipo por partido
+
+// TODO: hoy es un número fijo para las 12 competencias. Mejora pendiente:
+// calcularlo por competencia usando el promedio real de goles de esa liga
+// (ya tenemos golesFavor de toda la tabla para sacarlo sin llamadas nuevas).
+const PROMEDIO_GOLES_LIGA = 1.35;
+
+// Cuántos partidos necesita un equipo para que su promedio de goles se use
+// "a pleno" en el cálculo. Con menos partidos, se mezcla con el promedio
+// de liga para no dejar que un resultado raro dispare el número.
+const PARTIDOS_PARA_CONFIANZA_PLENA = 10;
 // =========================================
 
-// --- FUNCIONES AUXILIARES MATEMÁTICAS (POISSON) ---
 function factorial(n) {
   if (n === 0 || n === 1) return 1;
   let res = 1;
@@ -19,20 +27,15 @@ function factorial(n) {
   return res;
 }
 
-// Calcula la probabilidad de que un equipo marque exactamente 'k' goles con una media 'lambda'
 function poisson(k, lambda) {
   return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
 }
 
-// Limpia nombres de equipos
-function limpiarNombre(nombre) {
-  if (!nombre) return "";
-  return nombre
-    .replace(/\b(FC|CF|Real|Club|Deportivo|SD|UD)\b/gi, "")
-    .trim();
+function suavizarPromedio(promedioReal, partidosJugados) {
+  const peso = Math.min(partidosJugados, PARTIDOS_PARA_CONFIANZA_PLENA) / PARTIDOS_PARA_CONFIANZA_PLENA;
+  return promedioReal * peso + PROMEDIO_GOLES_LIGA * (1 - peso);
 }
 
-// --- EVALUADORES BÁSICOS 1X2 ---
 function puntosDeH2H(h2h, idLocal) {
   const agregados = h2h?.aggregates;
   const total = agregados?.numberOfMatches || 0;
@@ -67,7 +70,6 @@ function puntosDeTabla(posicionLocal, posicionVisitante, totalEquipos) {
   return { local: (fuerzaLocal / suma) * 100, visitante: (fuerzaVisitante / suma) * 100 };
 }
 
-// --- FUNCIÓN PRINCIPAL DE PREDICCIÓN ---
 function calcularPrediccion({
   h2h,
   idLocal,
@@ -81,7 +83,7 @@ function calcularPrediccion({
   statsLocal,
   statsVisitante,
 }) {
-  // 1. CÁLCULO DE PROBABILIDAD 1X2 (GANADOR)
+  // ---- 1. Probabilidad 1X2 (esto alimenta la barra de Probabilidades) ----
   const datosH2H = puntosDeH2H(h2h, idLocal);
   const tieneH2H = datosH2H.total > 0;
 
@@ -110,32 +112,21 @@ function calcularPrediccion({
   empate = Math.round((empate / suma) * 100);
   visitante = 100 - local - empate;
 
-  // Determinar ganador sugerido
-  const ordenado = [
-    { nombre: nombreLocal, valor: local },
-    { nombre: "Empate", valor: empate },
-    { nombre: nombreVisitante, valor: visitante },
-  ].sort((a, b) => b.valor - a.valor);
-
-  const prediccionGanador =
-    ordenado[0].valor - ordenado[1].valor < UMBRAL_EMPATE_TECNICO ? "Empate" : ordenado[0].nombre;
-
-  // 2. CÁLCULO DE GOLES CON DISTRIBUCIÓN DE POISSON
+  // ---- 2. Goles esperados con distribución de Poisson ----
   let probOver25 = 50;
   let probBTTS = 50;
   let ataqueL = 1.0, defensaV = 1.0;
   let ataqueV = 1.0, defensaL = 1.0;
-  let pjL = statsLocal?.partidosJugados || 0;
-  let pjV = statsVisitante?.partidosJugados || 0;
+  const pjL = statsLocal?.partidosJugados || 0;
+  const pjV = statsVisitante?.partidosJugados || 0;
+  const muestraChica = pjL < 5 || pjV < 5;
 
   if (pjL > 0 && pjV > 0) {
-    // Promedios por gol
-    const gFavorLocal = (statsLocal.golesFavor || 0) / pjL;
-    const gContraLocal = (statsLocal.golesContra || 0) / pjL;
-    const gFavorVisita = (statsVisitante.golesFavor || 0) / pjV;
-    const gContraVisita = (statsVisitante.golesContra || 0) / pjV;
+    const gFavorLocal = suavizarPromedio((statsLocal.golesFavor || 0) / pjL, pjL);
+    const gContraLocal = suavizarPromedio((statsLocal.golesContra || 0) / pjL, pjL);
+    const gFavorVisita = suavizarPromedio((statsVisitante.golesFavor || 0) / pjV, pjV);
+    const gContraVisita = suavizarPromedio((statsVisitante.golesContra || 0) / pjV, pjV);
 
-    // Goles esperados (Lambda)
     const lambdaLocal = Math.max(0.2, (gFavorLocal * gContraVisita) / PROMEDIO_GOLES_LIGA);
     const lambdaVisitante = Math.max(0.2, (gFavorVisita * gContraLocal) / PROMEDIO_GOLES_LIGA);
 
@@ -144,7 +135,6 @@ function calcularPrediccion({
     ataqueV = gFavorVisita;
     defensaV = gContraVisita;
 
-    // Matriz de marcadores posibles (de 0 a 5 goles cada equipo)
     let probOver25Sum = 0;
     let probBTTSSum = 0;
 
@@ -163,59 +153,114 @@ function calcularPrediccion({
     probBTTS = Math.round(probBTTSSum * 100);
   }
 
-  // 3. SELECCIÓN DEL MERCADO DE GOLES
-  let prediccionGoles = "Goles: Mercado reservado";
-  if (probOver25 >= 60) {
-    prediccionGoles = "+2.5 goles";
-  } else if (probOver25 <= 40) {
-    prediccionGoles = "-2.5 goles";
-  } else if (probBTTS >= 55 && probOver25 >= 50) {
-    prediccionGoles = "+1.5 goles";
-  }
+  // ---- 3. Armado de la lista de predicciones (solo se agregan si hay confianza) ----
+  const predicciones = [];
 
-  // 4. GENERACIÓN DE CONSEJO DETALLADO Y TENDENCIAS
-  const consejosExtra = [];
-  const nl = limpiarNombre(nombreLocal);
-  const nv = limpiarNombre(nombreVisitante);
-
-  // Lógica de Ganador / Empate en texto
+  // Categoría: Resultado
   const brecha = local - visitante;
-  if (brecha >= 30 || (local >= 50 && empate <= 32)) {
-    consejosExtra.push(`Victoria: ${nl}`);
-  } else if (-brecha >= 30 || (visitante >= 50 && empate <= 32)) {
-    consejosExtra.push(`Victoria: ${nv}`);
+  if (brecha >= 30 || (local >= 50 && empate <= UMBRAL_EMPATE_TECNICO * 4)) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Gana ${nombreLocal}`,
+      criterio: { resultados: ["local"] },
+    });
+  } else if (-brecha >= 30 || (visitante >= 50 && empate <= UMBRAL_EMPATE_TECNICO * 4)) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Gana ${nombreVisitante}`,
+      criterio: { resultados: ["visitante"] },
+    });
+  } else if (local + empate >= 65) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Doble oportunidad ${nombreLocal} o empate`,
+      criterio: { resultados: ["local", "empate"] },
+    });
+  } else if (visitante + empate >= 65) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Doble oportunidad ${nombreVisitante} o empate`,
+      criterio: { resultados: ["visitante", "empate"] },
+    });
   } else if (empate >= 33) {
-    consejosExtra.push("Analisis: Alta probabilidad de empate");
+    predicciones.push({
+      tipo: "resultado",
+      texto: "Empate probable",
+      criterio: { resultados: ["empate"] },
+    });
   }
 
-  // Anotadores / Ambos anotan
+  // Categoría: Goles totales del partido
+  if (probOver25 >= 60) {
+    predicciones.push({
+      tipo: "goles_totales",
+      texto: "+2.5 goles en el partido",
+      criterio: { umbral: 2.5, direccion: "mas" },
+    });
+  } else if (probOver25 <= 40) {
+    predicciones.push({
+      tipo: "goles_totales",
+      texto: "-2.5 goles en el partido",
+      criterio: { umbral: 2.5, direccion: "menos" },
+    });
+  } else if (probBTTS >= 55 && probOver25 >= 50) {
+    predicciones.push({
+      tipo: "goles_totales",
+      texto: "+1.5 goles en el partido",
+      criterio: { umbral: 1.5, direccion: "mas" },
+    });
+  }
+
+  // Categoría: Ambos marcan / marca un equipo puntual
   if (probBTTS >= 65) {
-    consejosExtra.push("Ambos van a marcar");
+    predicciones.push({
+      tipo: "ambos_marcan",
+      texto: "Ambos equipos van a marcar",
+      criterio: {},
+    });
   } else {
     if (probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3) {
-      consejosExtra.push(`${nl} va a marcar`);
+      predicciones.push({
+        tipo: "gol_equipo",
+        texto: `${nombreLocal} va a marcar`,
+        criterio: { equipo: "local" },
+      });
     }
     if (probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3) {
-      consejosExtra.push(`${nv} va a marcar`);
+      predicciones.push({
+        tipo: "gol_equipo",
+        texto: `${nombreVisitante} va a marcar`,
+        criterio: { equipo: "visitante" },
+      });
     }
   }
 
-  let consejoTexto = consejosExtra.join("\n");
-
-  if (pjL < 5 || pjV < 5) {
-    consejoTexto += consejoTexto ? "\n" : "";
-    consejoTexto += "DATO: Inicio de temporada (Stats volatiles).";
-  }
-
-  // 5. RETORNO DE ESTRUCTURA EXACTA PARA FLUTTER
   return {
-    prediccionGanador,
-    prediccionGoles,
-    porcentajeLocal: `${local}%`,
-    porcentajeEmpate: `${empate}%`,
-    porcentajeVisitante: `${visitante}%`,
-    consejo: consejoTexto || null,
+    porcentajeLocal: local,
+    porcentajeEmpate: empate,
+    porcentajeVisitante: visitante,
+    predicciones,
+    muestraChica,
   };
 }
 
-module.exports = { calcularPrediccion };
+function evaluarPrediccion(prediccion, { resultadoReal, golesLocal, golesVisitante }) {
+  switch (prediccion.tipo) {
+    case "resultado":
+      return prediccion.criterio.resultados.includes(resultadoReal);
+    case "goles_totales": {
+      const total = golesLocal + golesVisitante;
+      return prediccion.criterio.direccion === "mas"
+        ? total > prediccion.criterio.umbral
+        : total < prediccion.criterio.umbral;
+    }
+    case "ambos_marcan":
+      return golesLocal > 0 && golesVisitante > 0;
+    case "gol_equipo":
+      return prediccion.criterio.equipo === "local" ? golesLocal > 0 : golesVisitante > 0;
+    default:
+      return null;
+  }
+}
+
+module.exports = { calcularPrediccion, evaluarPrediccion };

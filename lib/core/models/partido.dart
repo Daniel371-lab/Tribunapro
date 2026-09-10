@@ -1,3 +1,22 @@
+class PrediccionItem {
+  final String tipo;
+  final String texto;
+  final bool? cumplida;
+
+  PrediccionItem({required this.tipo, required this.texto, this.cumplida});
+
+  static PrediccionItem? fromDynamic(dynamic dato) {
+    if (dato is! Map) return null;
+    final mapa = Map<String, dynamic>.from(dato);
+    if (mapa['tipo'] == null || mapa['texto'] == null) return null;
+    return PrediccionItem(
+      tipo: mapa['tipo'],
+      texto: mapa['texto'],
+      cumplida: mapa['cumplida'] is bool ? mapa['cumplida'] : null,
+    );
+  }
+}
+
 class EstadisticaEquipo {
   final int? posicion;
   final int? puntos;
@@ -59,12 +78,11 @@ class EnfrentamientoH2H {
   });
 
   static EnfrentamientoH2H? fromDynamic(dynamic dato) {
-    // Formato viejo (texto armado): lo ignoramos en vez de romper.
     if (dato is! Map) return null;
     final mapa = Map<String, dynamic>.from(dato);
+    if (mapa['equipoLocal'] == null || mapa['equipoVisitante'] == null) return null;
     final golesLocal = mapa['golesLocal'];
     final golesVisitante = mapa['golesVisitante'];
-    if (mapa['equipoLocal'] == null || mapa['equipoVisitante'] == null) return null;
     return EnfrentamientoH2H(
       equipoLocal: mapa['equipoLocal'],
       golesLocal: golesLocal is int ? golesLocal : (golesLocal as num?)?.toInt() ?? 0,
@@ -84,19 +102,17 @@ class Partido {
   final String equipoVisitante;
   final String? escudoVisitante;
   final DateTime fecha;
-  final String? prediccionGanador;
-  final String? prediccionGoles;
-  final String? porcentajeLocal;
-  final String? porcentajeEmpate;
-  final String? porcentajeVisitante;
-  final String? consejo;
+  final int? porcentajeLocal;
+  final int? porcentajeEmpate;
+  final int? porcentajeVisitante;
+  final List<PrediccionItem>? predicciones;
+  final bool muestraChica;
   final List<EnfrentamientoH2H>? h2h;
   final int? corners;
   final int? tarjetas;
   final bool esPro;
   final bool finalizado;
   final String? resultado;
-  final bool? acertado;
   final int? jornada;
   final int? medioTiempoLocal;
   final int? medioTiempoVisitante;
@@ -113,19 +129,17 @@ class Partido {
     required this.equipoVisitante,
     this.escudoVisitante,
     required this.fecha,
-    this.prediccionGanador,
-    this.prediccionGoles,
     this.porcentajeLocal,
     this.porcentajeEmpate,
     this.porcentajeVisitante,
-    this.consejo,
+    this.predicciones,
+    this.muestraChica = false,
     this.h2h,
     this.corners,
     this.tarjetas,
     this.esPro = false,
     this.finalizado = false,
     this.resultado,
-    this.acertado,
     this.jornada,
     this.medioTiempoLocal,
     this.medioTiempoVisitante,
@@ -133,17 +147,20 @@ class Partido {
     this.statsVisitante,
   });
 
-  static String? _comoPorcentaje(dynamic valor) {
-    if (valor == null) return null;
-    if (valor is String) return valor;
-    return '$valor%';
-  }
-
   static int? _comoInt(dynamic valor) {
     if (valor == null) return null;
     if (valor is int) return valor;
     if (valor is num) return valor.toInt();
     return null;
+  }
+
+  static List<PrediccionItem>? _comoPredicciones(dynamic valor) {
+    if (valor == null || valor is! List) return null;
+    final lista = valor
+        .map((e) => PrediccionItem.fromDynamic(e))
+        .whereType<PrediccionItem>()
+        .toList();
+    return lista.isEmpty ? null : lista;
   }
 
   static List<EnfrentamientoH2H>? _comoH2H(dynamic valor) {
@@ -166,19 +183,17 @@ class Partido {
       equipoVisitante: data['equipoVisitante'],
       escudoVisitante: data['escudoVisitante'],
       fecha: DateTime.parse(data['fecha']),
-      prediccionGanador: data['prediccionGanador'],
-      prediccionGoles: data['prediccionGoles'],
-      porcentajeLocal: _comoPorcentaje(data['porcentajeLocal']),
-      porcentajeEmpate: _comoPorcentaje(data['porcentajeEmpate']),
-      porcentajeVisitante: _comoPorcentaje(data['porcentajeVisitante']),
-      consejo: data['consejo'],
+      porcentajeLocal: _comoInt(data['porcentajeLocal']),
+      porcentajeEmpate: _comoInt(data['porcentajeEmpate']),
+      porcentajeVisitante: _comoInt(data['porcentajeVisitante']),
+      predicciones: _comoPredicciones(data['predicciones']),
+      muestraChica: data['muestraChica'] ?? false,
       h2h: _comoH2H(data['h2h']),
       corners: _comoInt(data['corners']),
       tarjetas: _comoInt(data['tarjetas']),
       esPro: data['esPro'] ?? false,
       finalizado: data['finalizado'] ?? false,
       resultado: data['resultado'],
-      acertado: data['acertado'],
       jornada: _comoInt(data['jornada']),
       medioTiempoLocal: _comoInt(data['medioTiempoLocal']),
       medioTiempoVisitante: _comoInt(data['medioTiempoVisitante']),
