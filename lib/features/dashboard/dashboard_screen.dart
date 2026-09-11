@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/ads/interstitial_ad_manager.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
 import 'widgets/partido_card.dart';
@@ -83,10 +84,18 @@ class DashboardScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                   physics: const BouncingScrollPhysics(),
                   itemCount: partidos.length,
-                  itemBuilder: (context, index) => PartidoCard(
-                    partido: partidos[index],
-                    onTap: () => context.push('/partido', extra: partidos[index]),
-                  ),
+                  itemBuilder: (context, index) {
+                    final partido = partidos[index];
+                    return PartidoCard(
+                      partido: partido,
+                      onTap: () {
+                        InterstitialAdManager.instance.mostrarSiCorresponde(
+                          esPro: partido.esPro,
+                          alTerminar: () => context.push('/partido', extra: partido),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             ),

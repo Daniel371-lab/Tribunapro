@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
+import '../../core/ads/interstitial_ad_manager.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
 import '../dashboard/widgets/partido_card.dart';
@@ -8,9 +9,9 @@ import 'data/competencias_data.dart';
 
 class CompetenciaDetailScreen extends StatelessWidget {
   final String competenciaId;
-  
+
   const CompetenciaDetailScreen({
-    super.key, 
+    super.key,
     required this.competenciaId,
   });
 
@@ -18,7 +19,7 @@ class CompetenciaDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final servicio = FirestoreService();
     final nombre = CompetenciasData.nombrePorId(competenciaId);
-    
+
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
@@ -57,7 +58,7 @@ class CompetenciaDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Subtítulo indicador
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -85,15 +86,15 @@ class CompetenciaDetailScreen extends StatelessWidget {
                       ),
                     );
                   }
-                  
+
                   if (!snapshot.hasData) {
                     return const Center(
                       child: CircularProgressIndicator(),
                     );
                   }
-                  
+
                   final partidos = snapshot.data!;
-                  
+
                   if (partidos.isEmpty) {
                     return Center(
                       child: Column(
@@ -117,15 +118,23 @@ class CompetenciaDetailScreen extends StatelessWidget {
                       ),
                     );
                   }
-                  
+
                   return ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     physics: const BouncingScrollPhysics(),
                     itemCount: partidos.length,
-                    itemBuilder: (context, index) => PartidoCard(
-                      partido: partidos[index],
-                      onTap: () => context.push('/partido', extra: partidos[index]),
-                    ),
+                    itemBuilder: (context, index) {
+                      final partido = partidos[index];
+                      return PartidoCard(
+                        partido: partido,
+                        onTap: () {
+                          InterstitialAdManager.instance.mostrarSiCorresponde(
+                            esPro: partido.esPro,
+                            alTerminar: () => context.push('/partido', extra: partido),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
               ),

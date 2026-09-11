@@ -86,9 +86,6 @@ class HistorialScreen extends StatelessWidget {
                   );
                 }
 
-                // Contamos predicciones evaluadas en TODOS los partidos del historial,
-                // no partidos como si fueran una unidad — un partido puede aportar
-                // varias predicciones (o ninguna, si no se generó ninguna para él).
                 int totalPredicciones = 0;
                 int aciertos = 0;
                 final partidosConPredicciones = <String>{};
