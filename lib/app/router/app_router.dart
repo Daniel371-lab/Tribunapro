@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/ads/banner_ad_widget.dart';
 import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
@@ -46,7 +47,7 @@ class AppRouter {
       final logueado = FirebaseAuth.instance.currentUser != null;
 
       if (enSplash) return null;
-      if (enTerminos) return null; // se puede leer sin estar logueado
+      if (enTerminos) return null;
       if (!logueado && !enLogin && !enRegistro) return '/login';
       if (logueado && (enLogin || enRegistro)) return '/';
       return null;
@@ -136,17 +137,26 @@ class _AppShell extends StatelessWidget {
       },
       child: Scaffold(
         body: navigationShell,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: (index) => navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          ),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
-            NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Competencias'),
-            NavigationDestination(icon: Icon(Icons.star_outline), label: 'Favoritos'),
-            NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavigationBar(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
+                NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Competencias'),
+                NavigationDestination(icon: Icon(Icons.star_outline), label: 'Favoritos'),
+                NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
+              ],
+            ),
+            SafeArea(
+              top: false,
+              child: BannerAdWidget(),
+            ),
           ],
         ),
       ),

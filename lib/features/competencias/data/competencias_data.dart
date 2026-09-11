@@ -24,9 +24,16 @@ class CompetenciasData {
     Competencia('EC', 'Eurocopa', 'https://crests.football-data.org/EC.png'),
   ];
 
-  static List<Competencia> get todas => [...ligas, ...copas];
+  // IDs que no están en juego actualmente: se ocultan de la lista visible,
+  // pero se mantienen en el mapeo de nombres para no romper referencias
+  // de partidos viejos (Historial, Favoritos) que ya tengan esa competencia.
+  static const ocultas = ['WC', 'EC'];
+
+  static List<Competencia> get todas =>
+      [...ligas, ...copas].where((c) => !ocultas.contains(c.id)).toList();
 
   static String nombrePorId(String id) {
-    return todas.firstWhere((c) => c.id == id, orElse: () => Competencia(id, id, '')).nombre;
+    final completa = [...ligas, ...copas];
+    return completa.firstWhere((c) => c.id == id, orElse: () => Competencia(id, id, '')).nombre;
   }
 }
