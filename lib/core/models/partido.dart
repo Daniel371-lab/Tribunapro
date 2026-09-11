@@ -182,7 +182,7 @@ class Partido {
       escudoLocal: data['escudoLocal'],
       equipoVisitante: data['equipoVisitante'],
       escudoVisitante: data['escudoVisitante'],
-      fecha: DateTime.parse(data['fecha']),
+      fecha: DateTime.parse(data['fecha']).toLocal(),
       porcentajeLocal: _comoInt(data['porcentajeLocal']),
       porcentajeEmpate: _comoInt(data['porcentajeEmpate']),
       porcentajeVisitante: _comoInt(data['porcentajeVisitante']),
