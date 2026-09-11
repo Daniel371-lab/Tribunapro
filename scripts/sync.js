@@ -204,7 +204,7 @@ async function actualizarResultados(matches) {
 
 async function purgarVencidos() {
   const limite = new Date();
-  limite.setDate(limite.getDate() - 1);
+  limite.setDate(limite.getDate() - 3);
   const snap = await db
     .collection("partidos")
     .where("finalizado", "==", true)
@@ -221,12 +221,10 @@ async function purgarVencidos() {
 
 async function main() {
   const hoy = new Date();
-  const ayer = new Date(hoy);
-  ayer.setDate(ayer.getDate() - 1);
   const dentroDeDosDias = new Date(hoy);
   dentroDeDosDias.setDate(dentroDeDosDias.getDate() + 2);
 
-  const desde = formatearFecha(ayer);
+  const desde = formatearFecha(hoy);
   const hasta = formatearFecha(dentroDeDosDias);
 
   console.log(`Trayendo partidos de ${desde} a ${hasta}...`);
