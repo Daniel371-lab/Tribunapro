@@ -9,7 +9,7 @@ import '../login/login_screen.dart';
 import '../login/registro_screen.dart';
 import 'modo_pro_screen.dart';
 
-const String _idPaquete = 'com.jplabs.tribunapro.tribunapro';
+const String _idPaquete = 'com.jplabs.tribunapro';
 const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
 
 class AjustesScreen extends StatelessWidget {

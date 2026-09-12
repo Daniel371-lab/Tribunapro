@@ -1,4 +1,4 @@
-package com.jplabs.tribunapro.tribunapro
+package com.jplabs.tribunapro
 
 import io.flutter.embedding.android.FlutterActivity
 
