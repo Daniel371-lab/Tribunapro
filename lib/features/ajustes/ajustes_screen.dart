@@ -4,8 +4,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
 import '../../app/theme/app_colors.dart';
+import '../../core/services/pro_state.dart';
 import '../login/login_screen.dart';
 import '../login/registro_screen.dart';
+import 'modo_pro_screen.dart';
 
 const String _idPaquete = 'com.jplabs.tribunapro.tribunapro';
 const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
@@ -88,7 +90,9 @@ class AjustesScreen extends StatelessWidget {
                         context,
                         Icons.workspace_premium_outlined,
                         'Modo Pro',
-                        onTap: () {},
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ModoProScreen()),
+                        ),
                       ),
                       _item(
                         context,
@@ -550,7 +554,7 @@ class AjustesScreen extends StatelessWidget {
     );
   }
 
-    // ==== VENTANA: Acerca de ====
+  // ==== VENTANA: Acerca de ====
 
   void _mostrarAcercaDe(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
@@ -623,7 +627,6 @@ class AjustesScreen extends StatelessWidget {
     );
   }
 
-
   // ==== VENTANA: Calificar la app ====
 
   void _mostrarCalificar(BuildContext context) {
@@ -658,7 +661,7 @@ class AjustesScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Calificanos en Play Store, nos ayuda un montón.',
+                  'Califícanos en Play Store, nos ayuda mucho.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: textoSecundario),
                 ),
@@ -703,7 +706,7 @@ class AjustesScreen extends StatelessWidget {
 
   Future<void> _compartirApp() async {
     await Share.share(
-      'Descargá Tribuna pro, predicciones de fútbol de las principales ligas y copas del mundo 🏆⚽\n$_urlPlayStore',
+      'Descarga Tribuna Pro, predicciones de fútbol de las principales ligas y copas del mundo 🏆⚽\n$_urlPlayStore',
     );
   }
 
@@ -807,40 +810,70 @@ class AjustesScreen extends StatelessWidget {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
 
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
-      builder: (context, mode, _) {
-        final esActivo = mode == ThemeMode.dark;
+    return ValueListenableBuilder<bool>(
+      valueListenable: esProNotifier,
+      builder: (context, esPro, _) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: themeModeNotifier,
+          builder: (context, mode, __) {
+            final esActivo = esPro && mode == ThemeMode.dark;
 
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.acento.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.dark_mode_outlined,
-              size: 20,
-              color: AppColors.acento,
-            ),
-          ),
-          title: Text(
-            'Modo oscuro',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: textoPrincipal,
-            ),
-          ),
-          trailing: Switch.adaptive(
-            value: esActivo,
-            activeColor: AppColors.acento,
-            onChanged: (activo) {
-              themeModeNotifier.value = activo ? ThemeMode.dark : ThemeMode.light;
-            },
-          ),
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.acento.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.dark_mode_outlined,
+                  size: 20,
+                  color: AppColors.acento,
+                ),
+              ),
+              title: Text(
+                'Modo oscuro',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: textoPrincipal,
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!esPro) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.proBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'PRO',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.pro),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Switch.adaptive(
+                    value: esActivo,
+                    activeColor: AppColors.acento,
+                    onChanged: (activo) {
+                      if (!esPro) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ModoProScreen()),
+                        );
+                        return;
+                      }
+                      themeModeNotifier.value = activo ? ThemeMode.dark : ThemeMode.light;
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
