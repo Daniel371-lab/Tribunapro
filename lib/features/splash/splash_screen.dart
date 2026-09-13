@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 
@@ -13,9 +14,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) context.go('/');
-    });
+    _decidirDestino();
+  }
+
+  Future<void> _decidirDestino() async {
+    // Esperamos la primera respuesta real de Firebase Auth (con la sesión
+    // ya restaurada si existía), en paralelo con un tiempo mínimo de marca
+    // para que el splash no parpadee en dispositivos muy rápidos.
+    final esperaMinima = Future.delayed(const Duration(seconds: 2));
+    final estadoAuth = FirebaseAuth.instance.authStateChanges().first;
+
+    await Future.wait([esperaMinima, estadoAuth]);
+
+    if (mounted) context.go('/');
   }
 
   @override

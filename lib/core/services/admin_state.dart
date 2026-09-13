@@ -6,13 +6,20 @@ import 'package:flutter/foundation.dart';
 final ValueNotifier<bool> esAdminNotifier = ValueNotifier<bool>(false);
 
 class AdminState {
-  static Future<void> verificar() async {
+  static Future<void> verificar({bool forzarRenovacion = false}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       esAdminNotifier.value = false;
       return;
     }
-    final resultado = await user.getIdTokenResult(true);
-    esAdminNotifier.value = resultado.claims?['admin'] == true;
+    try {
+      final resultado = await user.getIdTokenResult(forzarRenovacion);
+      esAdminNotifier.value = resultado.claims?['admin'] == true;
+    } catch (_) {
+      // Si falla la consulta del claim (red, token recién creado, etc.),
+      // no tocamos la sesión para nada. Simplemente asumimos "no admin"
+      // por ahora, sin arriesgar el estado de login del usuario.
+      esAdminNotifier.value = false;
+    }
   }
 }

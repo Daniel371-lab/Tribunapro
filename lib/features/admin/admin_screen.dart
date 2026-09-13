@@ -14,6 +14,12 @@ class _AdminScreenState extends State<AdminScreen> {
   final _servicio = FirestoreService();
   final Set<String> _marcadosPro = {};
   bool _publicando = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    AdminState.verificar(forzarRenovacion: true);
+  }
 
   Future<void> _publicarTodos(List<Partido> pendientes) async {
     setState(() => _publicando = true);
