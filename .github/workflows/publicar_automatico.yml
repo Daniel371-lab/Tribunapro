@@ -1,12 +1,12 @@
-name: Sync Partidos
+name: Publicar Automático
 
 on:
   schedule:
-    - cron: '0 23 * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
-  sync:
+  publicar:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,8 +21,7 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Ejecutar sincronización
+      - name: Publicar partidos pendientes
         env:
-          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
           FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}
-        run: node sync.js
+        run: node publicarAutomatico.js

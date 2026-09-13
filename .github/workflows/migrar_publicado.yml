@@ -1,12 +1,10 @@
-name: Sync Partidos
+name: Migrar Publicado
 
 on:
-  schedule:
-    - cron: '0 23 * * *'
   workflow_dispatch:
 
 jobs:
-  sync:
+  migrar:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,8 +19,7 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Ejecutar sincronización
+      - name: Migrar campo publicado
         env:
-          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
           FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}
-        run: node sync.js
+        run: node migrarPublicado.js

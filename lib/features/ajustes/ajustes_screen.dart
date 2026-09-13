@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
@@ -18,6 +19,8 @@ class AjustesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final user = FirebaseAuth.instance.currentUser;
+    final esInvitado = user == null || user.isAnonymous;
 
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
@@ -134,12 +137,13 @@ class AjustesScreen extends StatelessWidget {
                     superficie: superficie,
                     borde: borde,
                     children: [
-                      _item(
-                        context,
-                        Icons.logout_rounded,
-                        'Cerrar sesión',
-                        onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
-                      ),
+                      if (!esInvitado)
+                        _item(
+                          context,
+                          Icons.logout_rounded,
+                          'Cerrar sesión',
+                          onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
+                        ),
                       _item(
                         context,
                         Icons.delete_outline_rounded,
@@ -224,7 +228,13 @@ class AjustesScreen extends StatelessWidget {
                 final user = FirebaseAuth.instance.currentUser;
                 final esInvitado = user == null || user.isAnonymous;
 
-                if (!esInvitado) {
+                if (user != null) {
+                  await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).delete();
+                }
+
+                if (!esInvitado && user != null) {
+                  await user.delete();
+                } else if (esInvitado && user != null) {
                   await user.delete();
                 } else {
                   await FirebaseAuth.instance.signOut();

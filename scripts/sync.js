@@ -151,6 +151,7 @@ async function procesarPartidos(matches) {
         esPro: false,
         finalizado: false,
         resultado: null,
+		publicado: false,
         ...datos,
       });
       nuevos++;

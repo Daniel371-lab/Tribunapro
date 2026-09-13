@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/compras_service.dart';
+import '../login/registro_screen.dart';
 
 class ModoProScreen extends StatelessWidget {
   const ModoProScreen({super.key});
@@ -148,7 +150,7 @@ class ModoProScreen extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: () => _comprarSuscripcion(context),
+                        onPressed: () => _intentarComprarSuscripcion(context),
                         child: const Text(
                           'Hacerme Pro',
                           style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF04342C)),
@@ -214,7 +216,53 @@ class ModoProScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _comprarSuscripcion(BuildContext context) async {
-    await ComprasService.instance.comprarSuscripcion();
+  void _intentarComprarSuscripcion(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final esInvitado = user == null || user.isAnonymous;
+
+    if (esInvitado) {
+      _mostrarDialogoCrearCuenta(context);
+      return;
+    }
+
+    ComprasService.instance.comprarSuscripcion();
+  }
+
+  void _mostrarDialogoCrearCuenta(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _superficie,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Crea tu cuenta primero',
+          style: TextStyle(color: _textoPrincipal, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Para suscribirte a Modo Pro necesitás una cuenta registrada. Así, si cambiás de celular o reinstalás la app, no perdés el acceso a lo que ya pagaste.',
+          style: TextStyle(color: _textoSecundario, fontSize: 13.5, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ahora no', style: TextStyle(color: _textoSecundario)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.pro,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegistroScreen()),
+              );
+            },
+            child: const Text('Crear cuenta', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }
