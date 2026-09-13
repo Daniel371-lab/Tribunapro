@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/models/partido.dart';
+import '../../core/services/pro_state.dart';
+import '../../core/services/usuario_state.dart';
 import '../dashboard/widgets/escudo_imagen.dart';
+import '_bloqueo_pro_card.dart';
 
 class PartidoDetailScreen extends StatelessWidget {
   final Partido partido;
@@ -61,36 +64,12 @@ class PartidoDetailScreen extends StatelessWidget {
                     ),
                   ],
 
-                  if (partido.predicciones != null && partido.predicciones!.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildTituloSeccion(context, partido.finalizado ? 'Predicciones y resultado' : 'Nuestras predicciones'),
-                    const SizedBox(height: 10),
-                    _buildCardPredicciones(context),
-                    if (partido.muestraChica && !partido.finalizado) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.info_outline_rounded, size: 14, color: textoSecundario),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Inicio de temporada: las estadísticas todavía son limitadas.',
-                              style: TextStyle(fontSize: 11, color: textoSecundario),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
+                  const SizedBox(height: 20),
+                  _buildSeccionPredicciones(context),
 
                   if (partido.porcentajeLocal != null) ...[
                     const SizedBox(height: 18),
-                    _buildSeccion(
-                      context,
-                      titulo: 'Probabilidades',
-                      child: _buildBarraProbabilidad(context),
-                    ),
+                    _buildSeccion(context, titulo: 'Probabilidades', child: _buildBarraProbabilidad(context)),
                   ],
 
                   if (partido.corners != null || partido.tarjetas != null) ...[
@@ -126,6 +105,63 @@ class PartidoDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // Decide si mostrar el candado Pro, las predicciones normales, o nada.
+  Widget _buildSeccionPredicciones(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: esProNotifier,
+      builder: (context, esPro, _) {
+        return ValueListenableBuilder<Set<String>>(
+          valueListenable: UsuarioState.instance.partidosDesbloqueados,
+          builder: (context, desbloqueados, __) {
+            final bloqueado = partido.esPro &&
+                !partido.finalizado &&
+                !esPro &&
+                !desbloqueados.contains(partido.id);
+
+            if (bloqueado) {
+              return BloqueoProCard(partido: partido);
+            }
+
+            if (partido.predicciones == null || partido.predicciones!.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTituloSeccion(context, partido.finalizado ? 'Predicciones y resultado' : 'Nuestras predicciones'),
+                const SizedBox(height: 10),
+                _buildCardPredicciones(context),
+                if (partido.muestraChica && !partido.finalizado) ...[
+                  const SizedBox(height: 8),
+                  _buildAvisoMuestraChica(context),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAvisoMuestraChica(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline_rounded, size: 14, color: textoSecundario),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            'Inicio de temporada: las estadísticas todavía son limitadas.',
+            style: TextStyle(fontSize: 11, color: textoSecundario),
+          ),
+        ),
+      ],
     );
   }
 
@@ -172,9 +208,7 @@ class PartidoDetailScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
-                          color: mostrarEstado
-                              ? (acerto ? AppColors.acento : AppColors.error)
-                              : textoPrincipal,
+                          color: mostrarEstado ? (acerto ? AppColors.acento : AppColors.error) : textoPrincipal,
                         ),
                       ),
                     ),

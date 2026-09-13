@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
+import '../../core/services/compras_service.dart';
 
 class ModoProScreen extends StatelessWidget {
   const ModoProScreen({super.key});
@@ -213,11 +214,7 @@ class ModoProScreen extends StatelessWidget {
     );
   }
 
-  // TODO: conectar con el paquete in_app_purchase apenas el producto
-  // 'modo_pro_mensual' exista en Play Console. Por ahora solo avisa.
   Future<void> _comprarSuscripcion(BuildContext context) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('La suscripción todavía no está disponible, estamos preparando el pago.')),
-    );
+    await ComprasService.instance.comprarSuscripcion();
   }
 }
