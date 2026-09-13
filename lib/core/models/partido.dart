@@ -112,6 +112,7 @@ class Partido {
   final int? tarjetas;
   final bool esPro;
   final bool finalizado;
+  final bool publicado;
   final String? resultado;
   final int? jornada;
   final int? medioTiempoLocal;
@@ -139,6 +140,7 @@ class Partido {
     this.tarjetas,
     this.esPro = false,
     this.finalizado = false,
+    this.publicado = true,
     this.resultado,
     this.jornada,
     this.medioTiempoLocal,
@@ -193,6 +195,7 @@ class Partido {
       tarjetas: _comoInt(data['tarjetas']),
       esPro: data['esPro'] ?? false,
       finalizado: data['finalizado'] ?? false,
+      publicado: data['publicado'] ?? true,
       resultado: data['resultado'],
       jornada: _comoInt(data['jornada']),
       medioTiempoLocal: _comoInt(data['medioTiempoLocal']),

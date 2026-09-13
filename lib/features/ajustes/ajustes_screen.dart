@@ -9,6 +9,8 @@ import '../../core/services/pro_state.dart';
 import '../login/login_screen.dart';
 import '../login/registro_screen.dart';
 import 'modo_pro_screen.dart';
+import '../../core/services/admin_state.dart';
+import '../admin/admin_screen.dart';
 
 const String _idPaquete = 'com.jplabs.tribunapro';
 const String _urlPlayStore = 'https://play.google.com/store/apps/details?id=$_idPaquete';
@@ -152,6 +154,40 @@ class AjustesScreen extends StatelessWidget {
                         esPeligroso: true,
                       ),
                     ],
+                  ),
+
+                  ValueListenableBuilder<bool>(
+                    valueListenable: esAdminNotifier,
+                    builder: (context, esAdmin, _) {
+                      if (!esAdmin) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 24),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, bottom: 8),
+                            child: Text(
+                              'ADMINISTRADOR',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: textoSecundario),
+                            ),
+                          ),
+                          _buildGrupo(
+                            superficie: superficie,
+                            borde: borde,
+                            children: [
+                              _item(
+                                context,
+                                Icons.rule_rounded,
+                                'Partidos pendientes',
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const AdminScreen()),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
