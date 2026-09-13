@@ -69,7 +69,8 @@ class ComprasService {
               await UsuarioState.instance.desbloquearPorCompra(partidoId);
             }
             if (compra is GooglePlayPurchaseDetails) {
-              await _iap.consumePurchase(compra);
+              final addicionAndroid = _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+              await addicionAndroid.consumePurchase(compra);
             }
           }
         }
@@ -108,7 +109,7 @@ class ComprasService {
     final secuencia = parser.nextObject() as ASN1Sequence;
 
     final bitString = secuencia.elements[1] as ASN1BitString;
-    final parserInterno = ASN1Parser(bitString.stringValues as Uint8List);
+    final parserInterno = ASN1Parser(bitString.contentBytes());
     final secuenciaClave = parserInterno.nextObject() as ASN1Sequence;
 
     final modulo = secuenciaClave.elements[0] as ASN1Integer;
