@@ -18,9 +18,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _decidirDestino() async {
-    // Esperamos la primera respuesta real de Firebase Auth (con la sesión
-    // ya restaurada si existía), en paralelo con un tiempo mínimo de marca
-    // para que el splash no parpadee en dispositivos muy rápidos.
     final esperaMinima = Future.delayed(const Duration(seconds: 2));
     final estadoAuth = FirebaseAuth.instance.authStateChanges().first;
 
@@ -33,11 +30,11 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.acento,
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               'Tribuna Pro',
               style: TextStyle(
                 fontSize: 28,
@@ -46,8 +43,8 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: -0.5,
               ),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               'JPLABS',
               style: TextStyle(
                 fontSize: 13,
@@ -55,6 +52,12 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.white70,
                 letterSpacing: 1.5,
               ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'DEBUG: ${FirebaseAuth.instance.currentUser}',
+              style: const TextStyle(fontSize: 10, color: Colors.white),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
