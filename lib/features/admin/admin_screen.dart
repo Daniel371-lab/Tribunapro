@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
+import '../../core/services/admin_state.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
