@@ -713,12 +713,18 @@ class AjustesScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    5,
-                    (index) => const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
-                  ),
-                ),
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: List.generate(
+    5,
+    (index) => GestureDetector(
+      onTap: () {
+        Navigator.of(context).pop();
+        _abrirPlayStore();
+      },
+      child: const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
+    ),
+  ),
+),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,

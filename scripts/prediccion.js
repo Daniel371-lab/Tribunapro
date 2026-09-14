@@ -48,7 +48,7 @@ function puntosDeH2H(h2h, idLocal) {
 
   // [FIX 3] Suavizado Laplace: agregamos K pseudo-partidos "neutros" para
   // evitar que un H2H con 2-3 partidos dispare valores extremos (100%, 0%).
-  const totalSuav = total + 2 * H2H_SUAVIZADO_K;
+  const totalSuav = total + 3 * H2H_SUAVIZADO_K;
 
   return {
     local: ((victoriasLocal + H2H_SUAVIZADO_K) / totalSuav) * 100,

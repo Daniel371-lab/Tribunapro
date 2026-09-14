@@ -3,6 +3,7 @@ import '../../app/theme/app_colors.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/admin_state.dart';
+import '../partido/partido_detail_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -43,6 +44,12 @@ class _AdminScreenState extends State<AdminScreen> {
     } finally {
       if (mounted) setState(() => _publicando = false);
     }
+  }
+
+  void _verDetalle(Partido partido) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => PartidoDetailScreen(partido: partido)),
+    );
   }
 
   @override
@@ -112,49 +119,59 @@ class _AdminScreenState extends State<AdminScreen> {
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: superficie,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: borde, width: 0.8),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () => _verDetalle(partido),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          '${partido.equipoLocal} vs ${partido.equipoVisitante}',
-                                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textoPrincipal),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${partido.equipoLocal} vs ${partido.equipoVisitante}',
+                                                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textoPrincipal),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '${partido.competenciaNombre} • ${_formatearFecha(partido.fecha)}',
+                                                style: TextStyle(fontSize: 11.5, color: textoSecundario),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${partido.competenciaNombre} • ${_formatearFecha(partido.fecha)}',
-                                          style: TextStyle(fontSize: 11.5, color: textoSecundario),
+                                        Row(
+                                          children: [
+                                            Text('PRO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: marcado ? AppColors.pro : textoSecundario)),
+                                            Switch.adaptive(
+                                              value: marcado,
+                                              activeColor: AppColors.pro,
+                                              onChanged: (valor) {
+                                                setState(() {
+                                                  if (valor) {
+                                                    _marcadosPro.add(partido.id);
+                                                  } else {
+                                                    _marcadosPro.remove(partido.id);
+                                                  }
+                                                });
+                                              },
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Row(
-                                    children: [
-                                      Text('PRO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: marcado ? AppColors.pro : textoSecundario)),
-                                      Switch.adaptive(
-                                        value: marcado,
-                                        activeColor: AppColors.pro,
-                                        onChanged: (valor) {
-                                          setState(() {
-                                            if (valor) {
-                                              _marcadosPro.add(partido.id);
-                                            } else {
-                                              _marcadosPro.remove(partido.id);
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                ),
                               ),
                             );
                           },
