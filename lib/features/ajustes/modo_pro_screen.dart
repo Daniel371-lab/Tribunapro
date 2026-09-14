@@ -1,18 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/compras_service.dart';
 import '../login/registro_screen.dart';
 
-class ModoProScreen extends StatelessWidget {
+class ModoProScreen extends StatefulWidget {
   const ModoProScreen({super.key});
 
+  @override
+  State<ModoProScreen> createState() => _ModoProScreenState();
+}
+
+class _ModoProScreenState extends State<ModoProScreen> {
   // Colores fijos para esta pantalla: se muestra siempre con este estilo
   // "VIP" oscuro, sin importar el tema claro/oscuro elegido por el usuario.
   static const _fondo = Color(0xFF0D1117);
   static const _superficie = Color(0xFF161B22);
   static const _textoPrincipal = Color(0xFFF0F2F5);
   static const _textoSecundario = Color(0xFF9CA3AF);
+
+  ProductDetails? _producto;
+  bool _cargandoPrecio = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarPrecio();
+  }
+
+  Future<void> _cargarPrecio() async {
+    final producto = await ComprasService.instance.obtenerProductoSuscripcion();
+    if (mounted) {
+      setState(() {
+        _producto = producto;
+        _cargandoPrecio = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +93,7 @@ class ModoProScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Aprovecha el máximo potencial de la app',
+                      'Conviértete en un miembro VIP de la tribuna',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: _textoSecundario),
                     ),
@@ -83,7 +108,7 @@ class ModoProScreen extends StatelessWidget {
                     _beneficio(
                       icono: Icons.lock_open_rounded,
                       titulo: 'Todos los partidos liberados',
-                      detalle: 'Predicciones Pro sin desbloquear una por una',
+                      detalle: 'Predicciones Pro totalmente liberadas',
                     ),
                     const SizedBox(height: 10),
                     _beneficio(
@@ -112,30 +137,26 @@ class ModoProScreen extends StatelessWidget {
                               color: AppColors.pro,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          RichText(
-                            text: const TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Gs. 20.000 ',
-                                  style: TextStyle(
+                          const SizedBox(height: 6),
+                          _cargandoPrecio
+                              ? const SizedBox(
+                                  height: 26,
+                                  width: 26,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.pro,
+                                  ),
+                                )
+                              : Text(
+                                  _producto != null
+                                      ? '${_producto!.price} / mes'
+                                      : 'Precio no disponible',
+                                  style: const TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
                                     color: _textoPrincipal,
                                   ),
                                 ),
-                                TextSpan(
-                                  text: '/ mes',
-                                  style: TextStyle(fontSize: 13, color: _textoSecundario),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Precio final según tu país en Play Store',
-                            style: TextStyle(fontSize: 11, color: _textoSecundario),
-                          ),
                         ],
                       ),
                     ),
@@ -150,7 +171,9 @@ class ModoProScreen extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: () => _intentarComprarSuscripcion(context),
+                        onPressed: (_cargandoPrecio || _producto == null)
+                            ? null
+                            : () => _intentarComprarSuscripcion(context),
                         child: const Text(
                           'Hacerme Pro',
                           style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF04342C)),
@@ -239,7 +262,7 @@ class ModoProScreen extends StatelessWidget {
           style: TextStyle(color: _textoPrincipal, fontWeight: FontWeight.bold),
         ),
         content: const Text(
-          'Para suscribirte a Modo Pro necesitás una cuenta registrada. Así, si cambiás de celular o reinstalás la app, no perdés el acceso a lo que ya pagaste.',
+          'Para suscribirte a Modo Pro necesitas una cuenta registrada. Así, si cambias de celular o reinstalas la app, no pierdes el acceso a lo que ya pagaste.',
           style: TextStyle(color: _textoSecundario, fontSize: 13.5, height: 1.4),
         ),
         actions: [

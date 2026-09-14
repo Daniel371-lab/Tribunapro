@@ -48,6 +48,12 @@ class ComprasService {
     await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
   }
 
+  Future<ProductDetails?> obtenerProductoSuscripcion() async {
+    final response = await _iap.queryProductDetails({ComprasIds.suscripcionMensual});
+    if (response.productDetails.isEmpty) return null;
+    return response.productDetails.first;
+  }
+
   Future<void> _procesarCompras(List<PurchaseDetails> compras) async {
     for (final compra in compras) {
       if (compra.status == PurchaseStatus.pending) continue;
@@ -57,7 +63,8 @@ class ComprasService {
         continue;
       }
 
-      if (compra.status == PurchaseStatus.purchased || compra.status == PurchaseStatus.restored) {
+      if (compra.status == PurchaseStatus.purchased ||
+          compra.status == PurchaseStatus.restored) {
         final valida = _verificarFirma(compra);
 
         if (valida) {
@@ -69,7 +76,8 @@ class ComprasService {
               await UsuarioState.instance.desbloquearPorCompra(partidoId);
             }
             if (compra is GooglePlayPurchaseDetails) {
-              final addicionAndroid = _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+              final addicionAndroid =
+                  _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
               await addicionAndroid.consumePurchase(compra);
             }
           }
