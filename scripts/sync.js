@@ -139,6 +139,35 @@ async function procesarPartidos(matches) {
       const datos = await datosDelPartido(match);
       const { nombre, tipo } = datosCompetencia(match.competition.code);
 
+      // Si el partido ya terminó cuando lo creamos por primera vez,
+      // lo dejamos finalizado desde el arranque, con resultado y
+      // predicciones ya evaluadas. Esto evita partidos "fantasma"
+      // que existen en Firestore pero nunca se marcan como finalizados.
+      const yaFinalizo = match.status === "FINISHED";
+      const golesLocal = match.score?.fullTime?.home ?? null;
+      const golesVisitante = match.score?.fullTime?.away ?? null;
+
+      let prediccionesFinales = datos.predicciones;
+      let resultado = null;
+      let finalizado = false;
+
+      if (yaFinalizo && golesLocal !== null && golesVisitante !== null) {
+        const resultadoReal =
+          golesLocal > golesVisitante
+            ? "local"
+            : golesVisitante > golesLocal
+            ? "visitante"
+            : "empate";
+
+        prediccionesFinales = datos.predicciones.map((p) => ({
+          ...p,
+          cumplida: evaluarPrediccion(p, { resultadoReal, golesLocal, golesVisitante }),
+        }));
+
+        resultado = `${golesLocal}-${golesVisitante}`;
+        finalizado = true;
+      }
+
       await ref.set({
         tipo,
         competenciaId: match.competition.code,
@@ -149,16 +178,16 @@ async function procesarPartidos(matches) {
         escudoVisitante,
         fecha: match.utcDate,
         esPro: false,
-        finalizado: false,
-        resultado: null,
-		publicado: false,
+        finalizado,
+        resultado,
+        publicado: false,
         ...datos,
+        predicciones: prediccionesFinales,
       });
       nuevos++;
     } else if (!doc.data().finalizado) {
       // Solo se re-sincronizan datos extra (posición, medio tiempo, escudos)
-      // en partidos que todavía no terminaron. Un partido finalizado no
-      // debería cambiar sus predicciones/stats retroactivamente.
+      // en partidos que todavía no terminaron.
       const datos = await datosDelPartido(match);
       await ref.set({ escudoLocal, escudoVisitante, ...datos }, { merge: true });
       actualizadosExtra++;
@@ -234,11 +263,18 @@ async function main() {
   const partidos = await obtenerPartidos(desde, hasta);
   console.log(`Total partidos recibidos: ${partidos.length}`);
 
-  const actualizadosResultados = await actualizarResultados(partidos);
+  // ORDEN CORRECTO:
+  // 1) Primero creamos/actualizamos la base de cada partido.
+  //    Si un partido llega ya finalizado, se crea finalizado de una.
+  // 2) Después actualizamos resultados de los que quedaron pendientes.
+  //    Así nunca se saltea un partido por "no existir todavía".
   const { nuevos, actualizadosExtra } = await procesarPartidos(partidos);
+  const actualizadosResultados = await actualizarResultados(partidos);
   const borrados = await purgarVencidos();
 
-  console.log(`Nuevos: ${nuevos} | Actualizados con datos extra: ${actualizadosExtra} | Resultados actualizados: ${actualizadosResultados} | Purgados: ${borrados}`);
+  console.log(
+    `Nuevos: ${nuevos} | Actualizados con datos extra: ${actualizadosExtra} | Resultados actualizados: ${actualizadosResultados} | Purgados: ${borrados}`
+  );
 }
 
 main()
