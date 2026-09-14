@@ -36,12 +36,7 @@ class PartidoDetailScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       partido.competenciaNombre,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: textoPrincipal,
-                      ),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: textoPrincipal),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -228,7 +223,6 @@ class PartidoDetailScreen extends StatelessWidget {
     );
   }
 
-  // Sombra alineada con PartidoCard: más sutil que antes.
   BoxShadow _sombra(bool esOscuro) {
     return BoxShadow(
       color: (esOscuro ? Colors.black : const Color(0xFF1A1A1A)).withValues(alpha: esOscuro ? 0.35 : 0.05),
@@ -261,27 +255,33 @@ class PartidoDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         child: Column(
           children: [
-            // Fila superior: JORNADA (izq) + fecha corta (der)
+            // Fila superior: pill JORNADA (verde) a la izquierda, fecha
+            // anclada a la derecha (no se mueve según el texto).
             Row(
               children: [
                 if (partido.jornada != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: acentoActual,
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Text(
-                      'JORNADA ${partido.jornada}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                        color: Colors.white,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: acentoActual,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        'JORNADA ${partido.jornada}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ),
                 const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   partido.finalizado ? 'FINALIZADO' : _formatearDiaHora(partido.fecha),
                   style: TextStyle(
@@ -296,7 +296,6 @@ class PartidoDetailScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // Equipos + marcador
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -357,7 +356,6 @@ class PartidoDetailScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Fecha completa debajo (con ícono)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -477,10 +475,7 @@ class PartidoDetailScreen extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 4),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          decoration: BoxDecoration(
-            color: destacada ? acentoActual.withValues(alpha: 0.06) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(color: destacada ? acentoActual.withValues(alpha: 0.06) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
           child: Row(
             children: [
               Expanded(child: Text(_formatearValor(etiqueta, valorLocal), textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal))),
@@ -508,11 +503,7 @@ class PartidoDetailScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [_sombra(esOscuro)],
-      ),
+      decoration: BoxDecoration(color: superficie, borderRadius: BorderRadius.circular(14), boxShadow: [_sombra(esOscuro)]),
       child: Row(
         children: [
           Expanded(child: Text(enfrentamiento.equipoLocal, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textoPrincipal), overflow: TextOverflow.ellipsis)),
@@ -545,18 +536,13 @@ class PartidoDetailScreen extends StatelessWidget {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: superficie,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [_sombra(esOscuro)],
-          ),
+          decoration: BoxDecoration(color: superficie, borderRadius: BorderRadius.circular(18), boxShadow: [_sombra(esOscuro)]),
           child: child,
         ),
       ],
     );
   }
 
-  /// Mismo formato corto que usa PartidoCard en la lista: "SAB/13:30".
   String _formatearDiaHora(DateTime fecha) {
     const dias = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
     final dia = dias[fecha.weekday - 1];
@@ -564,7 +550,6 @@ class PartidoDetailScreen extends StatelessWidget {
     return '$dia/$hora';
   }
 
-  /// Formato largo para la línea inferior del hero: "14 Sep • 13:30".
   String _formatearFechaCompleta(DateTime fecha) {
     final meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     final hora = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';

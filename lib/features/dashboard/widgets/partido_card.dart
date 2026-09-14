@@ -21,12 +21,16 @@ class PartidoCard extends StatelessWidget {
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final acentoActual = esOscuro ? AppColors.acentoOscuro : AppColors.acento;
 
-    // Color de la barrita lateral según estado del partido
+    // Pill de competencia en gris medio para que destaque sobre la card blanca.
+    final colorPill = esOscuro
+        ? Colors.white.withValues(alpha: 0.12)
+        : const Color(0xFFE0E0E0);
+
     final Color colorLateral;
     if (partido.finalizado) {
       colorLateral = textoSecundario.withValues(alpha: 0.35);
     } else if (partido.esPro) {
-      colorLateral = const Color(0xFFE8B923); // ámbar = PRO pendiente
+      colorLateral = const Color(0xFFE8B923);
     } else {
       colorLateral = acentoActual;
     }
@@ -57,7 +61,6 @@ class PartidoCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Barrita lateral de estado
                   Container(width: 3, color: colorLateral),
                   Expanded(
                     child: Padding(
@@ -65,53 +68,58 @@ class PartidoCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Fila superior: badge competencia + PRO + fecha
+                          // Fila superior: pill de competencia + PRO a la izquierda
+                          // (se ajustan a su contenido), fecha anclada a la derecha.
                           Row(
                             children: [
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: acentoActual.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                  child: Text(
-                                    partido.competenciaNombre.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.7,
-                                      color: acentoActual,
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: colorPill,
+                                          borderRadius: BorderRadius.circular(7),
+                                        ),
+                                        child: Text(
+                                          partido.competenciaNombre.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.7,
+                                            color: acentoActual,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ),
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
+                                    if (partido.esPro) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.pro,
+                                          borderRadius: BorderRadius.circular(7),
+                                        ),
+                                        child: const Text(
+                                          'PRO',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
-                              if (partido.esPro) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.pro,
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                  child: const Text(
-                                    'PRO',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               Text(
-                                partido.finalizado
-                                    ? 'FINALIZADO'
-                                    : _formatearDiaHora(partido.fecha),
+                                partido.finalizado ? 'FINALIZADO' : _formatearDiaHora(partido.fecha),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
@@ -124,10 +132,8 @@ class PartidoCard extends StatelessWidget {
 
                           const SizedBox(height: 16),
 
-                          // Fila equipos
                           Row(
                             children: [
-                              // Local
                               Expanded(
                                 child: Row(
                                   children: [
@@ -149,8 +155,6 @@ class PartidoCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
-
-                              // Centro: VS o resultado
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
@@ -165,8 +169,6 @@ class PartidoCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-
-                              // Visitante
                               Expanded(
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
@@ -205,7 +207,6 @@ class PartidoCard extends StatelessWidget {
     );
   }
 
-  /// Formatea la fecha como "SAB/13:30" (día abreviado + hora).
   String _formatearDiaHora(DateTime fecha) {
     const dias = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
     final dia = dias[fecha.weekday - 1];
