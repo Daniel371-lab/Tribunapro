@@ -628,10 +628,24 @@ void _mostrarAcercaDe(BuildContext context) {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Tribuna Pro',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
-              ),
+              Text.rich(
+  TextSpan(
+    children: [
+      TextSpan(
+        text: 'Tribuna ',
+        style: TextStyle(color: textoPrincipal),
+      ),
+      const TextSpan(
+        text: 'Pro',
+        style: TextStyle(color: Color(0xFF890F20)),
+      ),
+    ],
+  ),
+  style: const TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+  ),
+),
               const SizedBox(height: 6),
               Text(
                 'Desarrollado por JPLABS',
@@ -639,15 +653,17 @@ void _mostrarAcercaDe(BuildContext context) {
                 style: TextStyle(fontSize: 13, color: textoSecundario),
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                width: 96,
-                height: 96,
-                child: Image.asset(
-                  'assets/icon/app_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 12),
+ClipOval(
+  child: SizedBox(
+    width: 96,
+    height: 96,
+    child: Image.asset(
+      'assets/icon/app_icon.png',
+      fit: BoxFit.cover,
+    ),
+  ),
+),
+const SizedBox(height: 12),
               Text(
                 'Versión 1.0.0',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),

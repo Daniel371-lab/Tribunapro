@@ -24,14 +24,25 @@ class DashboardScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Tribuna Pro',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                  ),
-                ),
+                Text.rich(
+  TextSpan(
+    children: [
+      TextSpan(
+        text: 'Tribuna ',
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
+      ),
+      const TextSpan(
+        text: 'Pro',
+        style: TextStyle(color: Color(0xFF890F20)),
+      ),
+    ],
+  ),
+  style: const TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    letterSpacing: -0.5,
+  ),
+),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, size: 24),
                   onPressed: () => context.push('/ajustes'),
