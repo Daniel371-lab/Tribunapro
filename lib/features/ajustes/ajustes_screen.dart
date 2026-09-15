@@ -602,76 +602,76 @@ class AjustesScreen extends StatelessWidget {
 
   // ==== VENTANA: Acerca de ====
 
-  void _mostrarAcercaDe(BuildContext context) {
-    final esOscuro = Theme.of(context).brightness == Brightness.dark;
-    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
-    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
-    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+void _mostrarAcercaDe(BuildContext context) {
+  final esOscuro = Theme.of(context).brightness == Brightness.dark;
+  final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+  final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+  final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: superficie,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 28,
-              bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Tribuna Pro',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Desarrollado por JPLABS',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: textoSecundario),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.acento.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Versión 1.0.0',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.acento,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Entendido'),
-                  ),
-                ),
-              ],
-            ),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: superficie,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 28,
+            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
           ),
-        );
-      },
-    );
-  }
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Tribuna Pro',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textoPrincipal),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Desarrollado por JPLABS',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: textoSecundario),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 96,
+                height: 96,
+                child: Image.asset(
+                  'assets/icon/app_icon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Versión 1.0.0',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.acento,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Entendido'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   // ==== VENTANA: Calificar la app ====
 

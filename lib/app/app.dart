@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/widgets/verificar_conexion.dart';
 import 'theme/app_theme.dart';
 import 'router/app_router.dart';
 
@@ -19,6 +20,9 @@ class TribunaProApp extends StatelessWidget {
           darkTheme: AppTheme.dark,
           themeMode: mode,
           routerConfig: AppRouter.router,
+          builder: (context, child) {
+            return VerificarConexion(child: child ?? const SizedBox.shrink());
+          },
         );
       },
     );

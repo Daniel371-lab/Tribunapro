@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/ads/interstitial_ad_manager.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
+import '../../core/widgets/estado_vacio.dart';
 import 'widgets/partido_card.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -24,7 +25,7 @@ class DashboardScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Fútbol Predicción Pro',
+                  'Tribuna Pro',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -59,25 +60,21 @@ class DashboardScreen extends StatelessWidget {
               stream: servicio.proximosPartidos(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const Center(
-                    child: Text(
-                      'No se pudo cargar los partidos',
-                      style: TextStyle(fontSize: 14),
-                    ),
+                  return const EstadoVacio(
+                    icono: Icons.cloud_off_rounded,
+                    titulo: 'No pudimos cargar los partidos',
+                    subtitulo: 'Revisá tu conexión a internet e intentá de nuevo.',
                   );
                 }
                 if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 }
                 final partidos = snapshot.data!;
                 if (partidos.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No hay próximos partidos cargados',
-                      style: TextStyle(fontSize: 14),
-                    ),
+                  return const EstadoVacio(
+                    icono: Icons.sports_soccer_rounded,
+                    titulo: 'No hay partidos próximos',
+                    subtitulo: 'Estamos preparando los próximos encuentros. Volvé en un rato.',
                   );
                 }
                 return ListView.builder(

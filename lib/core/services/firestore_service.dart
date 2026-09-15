@@ -6,11 +6,13 @@ class FirestoreService {
   CollectionReference get _partidos => _db.collection('partidos');
 
   Stream<List<Partido>> proximosPartidos({int limite = 10}) {
-    final ahora = DateTime.now().toIso8601String();
+    // Nota: NO filtramos por DateTime.now() acá. El filtro
+    // finalizado == false ya garantiza "próximos partidos", y así
+    // la query no depende del reloj ni de la zona horaria del
+    // dispositivo del usuario. Todos ven exactamente lo mismo.
     return _partidos
         .where('publicado', isEqualTo: true)
         .where('finalizado', isEqualTo: false)
-        .where('fecha', isGreaterThan: ahora)
         .orderBy('fecha')
         .limit(limite)
         .snapshots()
