@@ -173,18 +173,54 @@ class HistorialScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: acentoActual.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '$porcentaje%',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: acentoActual),
-              ),
+          // Anillo de progreso: aro tenue de fondo + aro verde que se
+          // rellena según el porcentaje. 100% = círculo cerrado,
+          // 50% = medio círculo, 0% = solo el aro tenue.
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Aro de fondo (siempre completo, tenue)
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: CircularProgressIndicator(
+                    value: 1.0,
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      acentoActual.withValues(alpha: 0.15),
+                    ),
+                  ),
+                ),
+                // Aro de progreso (se llena según el %)
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: CircularProgressIndicator(
+                    value: porcentaje / 100,
+                    strokeWidth: 4,
+                    strokeCap: StrokeCap.round,
+                    valueColor: AlwaysStoppedAnimation<Color>(acentoActual),
+                  ),
+                ),
+                // Círculo verde claro con el % adentro
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: acentoActual.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$porcentaje%',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: acentoActual),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 16),

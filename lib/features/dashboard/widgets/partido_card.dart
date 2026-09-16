@@ -13,6 +13,11 @@ class PartidoCard extends StatelessWidget {
     required this.onTap,
   });
 
+  // Azul para partidos próximos (no finalizados, no Pro).
+  static const Color _azulProximo = Color(0xFF3B82F6);
+  // Ámbar para partidos Pro pendientes de pago.
+  static const Color _ambarPro = Color(0xFFE8B923);
+
   @override
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
@@ -21,18 +26,40 @@ class PartidoCard extends StatelessWidget {
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final acentoActual = esOscuro ? AppColors.acentoOscuro : AppColors.acento;
 
-    // Pill de competencia en gris medio para que destaque sobre la card blanca.
     final colorPill = esOscuro
         ? Colors.white.withValues(alpha: 0.12)
         : const Color(0xFFE0E0E0);
 
-    final Color colorLateral;
+    // ---- Barra lateral de estado ----
+    // - Finalizado con predicciones evaluadas → gradiente verde/rojo
+    //   proporcional a (aciertos / total).
+    // - Finalizado sin predicciones → gris neutro.
+    // - Próximo no Pro → azul.
+    // - Pro pendiente → ámbar.
+    final List<Color> coloresBarra;
+    final List<double> stopsBarra;
+
     if (partido.finalizado) {
-      colorLateral = textoSecundario.withValues(alpha: 0.35);
+      final preds = partido.predicciones ?? const [];
+      final evaluadas = preds.where((p) => p.cumplida != null).toList();
+      final total = evaluadas.length;
+      final aciertos = evaluadas.where((p) => p.cumplida == true).length;
+
+      if (total > 0) {
+        final fraccionVerde = aciertos / total;
+        coloresBarra = [acentoActual, acentoActual, AppColors.error, AppColors.error];
+        stopsBarra = [0, fraccionVerde, fraccionVerde, 1];
+      } else {
+        final gris = textoSecundario.withValues(alpha: 0.35);
+        coloresBarra = [gris, gris];
+        stopsBarra = [0, 1];
+      }
     } else if (partido.esPro) {
-      colorLateral = const Color(0xFFE8B923);
+      coloresBarra = [_ambarPro, _ambarPro];
+      stopsBarra = [0, 1];
     } else {
-      colorLateral = acentoActual;
+      coloresBarra = [_azulProximo, _azulProximo];
+      stopsBarra = [0, 1];
     }
 
     return Container(
@@ -61,15 +88,23 @@ class PartidoCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(width: 3, color: colorLateral),
+                  Container(
+                    width: 3,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: coloresBarra,
+                        stops: stopsBarra,
+                      ),
+                    ),
+                  ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Fila superior: pill de competencia + PRO a la izquierda
-                          // (se ajustan a su contenido), fecha anclada a la derecha.
                           Row(
                             children: [
                               Expanded(

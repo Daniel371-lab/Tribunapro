@@ -12,7 +12,7 @@ class AppColors {
 
   // Claro
   static const fondoClaro = Color(0xFFFFFFFF);
-  static const superficieClaro = Color(0xFFF5F7FA);
+  static const superficieClaro = Color(0xFFE5E8EC);
   static const textoClaro = Color(0xFF1A1A1A);
   static const textoSecundarioClaro = Color(0xFF6B7280);
   static const bordeClaro = Color(0xFFE1E4E8);

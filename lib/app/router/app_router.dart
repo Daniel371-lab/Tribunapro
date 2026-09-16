@@ -124,27 +124,62 @@ class AppRouter {
   );
 }
 
-class _AppShell extends StatelessWidget {
+class _AppShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const _AppShell({required this.navigationShell});
 
   @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  double _dragDistance = 0;
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: navigationShell.currentIndex == 0,
+      canPop: widget.navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) navigationShell.goBranch(0);
+        if (!didPop) widget.navigationShell.goBranch(0);
       },
       child: Scaffold(
-        body: navigationShell,
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragUpdate: (details) {
+            _dragDistance += details.delta.dx;
+          },
+          onHorizontalDragEnd: (details) {
+            final velocity = details.primaryVelocity ?? 0;
+            final totalBranches = widget.navigationShell.route.branches.length;
+
+            // Detecta swipe por velocidad o por distancia recorrida
+            final swipeIzquierda = velocity < -250 || _dragDistance < -60;
+            final swipeDerecha = velocity > 250 || _dragDistance > 60;
+
+            if (swipeIzquierda) {
+              final siguiente = widget.navigationShell.currentIndex + 1;
+              if (siguiente < totalBranches) {
+                widget.navigationShell.goBranch(siguiente);
+              }
+            } else if (swipeDerecha) {
+              final anterior = widget.navigationShell.currentIndex - 1;
+              if (anterior >= 0) {
+                widget.navigationShell.goBranch(anterior);
+              }
+            }
+
+            _dragDistance = 0;
+          },
+          child: widget.navigationShell,
+        ),
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
+              selectedIndex: widget.navigationShell.currentIndex,
+              onDestinationSelected: (index) => widget.navigationShell.goBranch(
                 index,
-                initialLocation: index == navigationShell.currentIndex,
+                initialLocation: index == widget.navigationShell.currentIndex,
               ),
               destinations: const [
                 NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),

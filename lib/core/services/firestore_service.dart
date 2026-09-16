@@ -5,11 +5,19 @@ class FirestoreService {
   final _db = FirebaseFirestore.instance;
   CollectionReference get _partidos => _db.collection('partidos');
 
+  // Helper: un partido se considera "válido para mostrar al usuario" solo
+  // si tiene al menos una predicción cargada. Se aplica en las 3 queries
+  // del usuario (dashboard, competencias, historial).
+  bool _tienePredicciones(Partido p) {
+    final preds = p.predicciones;
+    return preds != null && preds.isNotEmpty;
+  }
+
   Stream<List<Partido>> proximosPartidos({int limite = 10}) {
     // Nota: NO filtramos por DateTime.now() acá. El filtro
     // finalizado == false ya garantiza "próximos partidos", y así
     // la query no depende del reloj ni de la zona horaria del
-    // dispositivo del usuario. Todos ven exactamente lo mismo.
+    // dispositivo del usuario.
     return _partidos
         .where('publicado', isEqualTo: true)
         .where('finalizado', isEqualTo: false)
@@ -18,6 +26,7 @@ class FirestoreService {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => Partido.fromMap(d.id, d.data() as Map<String, dynamic>))
+            .where(_tienePredicciones)
             .toList());
   }
 
@@ -30,6 +39,7 @@ class FirestoreService {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => Partido.fromMap(d.id, d.data() as Map<String, dynamic>))
+            .where(_tienePredicciones)
             .toList());
   }
 
@@ -42,10 +52,12 @@ class FirestoreService {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => Partido.fromMap(d.id, d.data() as Map<String, dynamic>))
+            .where(_tienePredicciones)
             .toList());
   }
 
-  // Solo para el panel de administrador: partidos pendientes de revisión.
+  // Panel de administrador: NO filtra por predicciones. El admin ve todos
+  // los pendientes para decidir cuáles marcar como Pro antes de publicar.
   Stream<List<Partido>> partidosPendientes() {
     return _partidos
         .where('publicado', isEqualTo: false)
