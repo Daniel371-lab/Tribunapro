@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
@@ -29,9 +31,52 @@ class ComprasService {
     final disponible = await _iap.isAvailable();
     if (!disponible) return;
     _sub = _iap.purchaseStream.listen(_procesarCompras);
+
+    // Al arrancar la app verificamos el estado real de la suscripción
+    // contra Google Play. Si el usuario canceló o no se renovó el pago,
+    // esto lo detecta y actualiza Firestore en consecuencia.
+    await _verificarEstadoSuscripcion();
   }
 
   void dispose() => _sub?.cancel();
+
+  /// Consulta a Google Play qué compras siguen activas para este usuario
+  /// y sincroniza el campo `suscripcionProActiva` en Firestore.
+  ///
+  /// - Si la suscripción está activa (pagada o en período de gracia) →
+  ///   Firestore queda en true.
+  /// - Si la suscripción expiró o está en "account hold" → Firestore
+  ///   queda en false.
+  /// - Si la consulta falla (sin red, sin Play Services, etc.) → no
+  ///   tocamos nada, para no castigar al usuario por un fallo transitorio.
+  Future<void> _verificarEstadoSuscripcion() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+
+    try {
+      final androidAddition =
+          _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+      final response = await androidAddition.queryPurchases();
+
+      final tieneSuscripcionActiva = response.pastPurchases.any(
+        (p) =>
+            p.productID == ComprasIds.suscripcionMensual &&
+            (p.status == PurchaseStatus.purchased ||
+                p.status == PurchaseStatus.restored),
+      );
+
+      if (tieneSuscripcionActiva) {
+        await UsuarioState.instance.activarSuscripcion();
+      } else {
+        await UsuarioState.instance.desactivarSuscripcion();
+      }
+    } catch (e) {
+      // No tocamos Firestore si la consulta falla. Preferimos que el
+      // usuario siga con el acceso que tenía antes que cortárselo por
+      // un problema de red.
+      debugPrint('No se pudo verificar la suscripción: $e');
+    }
+  }
 
   Future<void> comprarSuscripcion() async {
     final response = await _iap.queryProductDetails({ComprasIds.suscripcionMensual});

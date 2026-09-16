@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../../core/ads/banner_ad_widget.dart';
 import '../../core/services/pro_state.dart';
-import '../../core/widgets/agradecimiento_pro_card.dart';
 import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
@@ -198,15 +197,18 @@ class _AppShellState extends State<_AppShell> {
                 NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
               ],
             ),
-            SafeArea(
-              top: false,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: esProNotifier,
-                builder: (context, esPro, _) {
-                  if (esPro) return const AgradecimientoProCard();
-                  return const BannerAdWidget();
-                },
-              ),
+            // Banner dinámico: si el usuario es Pro, se elimina por completo
+            // (SizedBox.shrink) y la barra inferior baja automáticamente.
+            // Si no es Pro, aparece el banner con su SafeArea.
+            ValueListenableBuilder<bool>(
+              valueListenable: esProNotifier,
+              builder: (context, esPro, _) {
+                if (esPro) return const SizedBox.shrink();
+                return SafeArea(
+                  top: false,
+                  child: const BannerAdWidget(),
+                );
+              },
             ),
           ],
         ),
