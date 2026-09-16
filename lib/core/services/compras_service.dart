@@ -56,7 +56,13 @@ class ComprasService {
     try {
       final androidAddition =
           _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
-      final response = await androidAddition.queryPurchases();
+      final response = await androidAddition.queryPastPurchases();
+
+      // Si la consulta devolvió un error, no tocamos Firestore.
+      if (response.error != null) {
+        debugPrint('Error al consultar compras pasadas: ${response.error}');
+        return;
+      }
 
       final tieneSuscripcionActiva = response.pastPurchases.any(
         (p) =>
