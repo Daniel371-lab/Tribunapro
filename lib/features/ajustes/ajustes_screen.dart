@@ -121,40 +121,49 @@ class AjustesScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 24),
-
-                  // Seccion Cuenta / Acciones
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text(
-                      'CUENTA',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        color: textoSecundario,
-                      ),
-                    ),
-                  ),
-                  _buildGrupo(
-                    superficie: superficie,
-                    borde: borde,
-                    children: [
-                      if (!esInvitado)
-                        _item(
-                          context,
-                          Icons.logout_rounded,
-                          'Cerrar sesión',
-                          onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
-                        ),
-                      _item(
-                        context,
-                        Icons.delete_outline_rounded,
-                        'Eliminar cuenta',
-                        onTap: () => _confirmarEliminarCuenta(context, textoPrincipal, textoSecundario, superficie),
-                        esPeligroso: true,
-                      ),
-                    ],
-                  ),
+// Seccion Cuenta / Acciones
+Padding(
+  padding: const EdgeInsets.only(left: 4, bottom: 8),
+  child: Text(
+    'CUENTA',
+    style: TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.bold,
+      letterSpacing: 1.2,
+      color: textoSecundario,
+    ),
+  ),
+),
+// StreamBuilder para reaccionar en vivo al authStateChanges:
+// evita que el botón quede oculto si el usuario llega a esta
+// pantalla antes de que Firebase restaure la sesión.
+StreamBuilder<User?>(
+  stream: FirebaseAuth.instance.authStateChanges(),
+  builder: (context, snapshot) {
+    final userActual = snapshot.data;
+    final esInvitadoActual = userActual == null || userActual.isAnonymous;
+    return _buildGrupo(
+      superficie: superficie,
+      borde: borde,
+      children: [
+        if (!esInvitadoActual)
+          _item(
+            context,
+            Icons.logout_rounded,
+            'Cerrar sesión',
+            onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
+          ),
+        _item(
+          context,
+          Icons.delete_outline_rounded,
+          'Eliminar cuenta',
+          onTap: () => _confirmarEliminarCuenta(context, textoPrincipal, textoSecundario, superficie),
+          esPeligroso: true,
+        ),
+      ],
+    );
+  },
+),
 
                   ValueListenableBuilder<bool>(
                     valueListenable: esAdminNotifier,

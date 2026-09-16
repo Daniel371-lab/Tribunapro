@@ -201,7 +201,7 @@ class _ModoProScreenState extends State<ModoProScreen> {
                       valueListenable: esProNotifier,
                       builder: (context, esPro, _) {
                         final bloqueado = esPro || _cargandoPrecio || _producto == null;
-                        final texto = esPro ? 'Ya sos Pro ✓' : 'Hacerme Pro';
+                        final texto = esPro ? 'Ya eres Pro ✓' : 'Hacerme Pro';
 
                         return SizedBox(
                           width: double.infinity,
