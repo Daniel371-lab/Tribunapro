@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import '../theme/app_colors.dart';
 import '../../core/ads/banner_ad_widget.dart';
+import '../../core/services/pro_state.dart';
+import '../../core/widgets/agradecimiento_pro_card.dart';
 import '../../core/models/partido.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
@@ -133,10 +136,17 @@ class _AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<_AppShell> {
+  // Gris viejo de la barra inferior en modo claro. No queremos que herede
+  // el gris nuevo (#E5E8EC) que usan las cards de partidos.
+  static const Color _grisBarraClaro = Color(0xFFF5F7FA);
+
   double _dragDistance = 0;
 
   @override
   Widget build(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final colorBarra = esOscuro ? AppColors.superficieOscuro : _grisBarraClaro;
+
     return PopScope(
       canPop: widget.navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -152,7 +162,6 @@ class _AppShellState extends State<_AppShell> {
             final velocity = details.primaryVelocity ?? 0;
             final totalBranches = widget.navigationShell.route.branches.length;
 
-            // Detecta swipe por velocidad o por distancia recorrida
             final swipeIzquierda = velocity < -250 || _dragDistance < -60;
             final swipeDerecha = velocity > 250 || _dragDistance > 60;
 
@@ -176,6 +185,7 @@ class _AppShellState extends State<_AppShell> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
+              backgroundColor: colorBarra,
               selectedIndex: widget.navigationShell.currentIndex,
               onDestinationSelected: (index) => widget.navigationShell.goBranch(
                 index,
@@ -190,7 +200,13 @@ class _AppShellState extends State<_AppShell> {
             ),
             SafeArea(
               top: false,
-              child: BannerAdWidget(),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: esProNotifier,
+                builder: (context, esPro, _) {
+                  if (esPro) return const AgradecimientoProCard();
+                  return const BannerAdWidget();
+                },
+              ),
             ),
           ],
         ),

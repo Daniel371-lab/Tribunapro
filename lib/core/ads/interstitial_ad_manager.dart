@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'ad_ids.dart';
+import '../services/pro_state.dart';
 
 /// Controla cuándo mostrar el intersticial al entrar al detalle de un
 /// partido no-Pro: 1 de cada 2 visitas (1, 3, 5, 7...), contador que se
@@ -18,6 +19,9 @@ class InterstitialAdManager {
   }
 
   void _precargar() {
+    // Si el usuario ya es Pro, no tiene sentido precargar nada.
+    if (esProNotifier.value) return;
+
     InterstitialAd.load(
       adUnitId: AdIds.intersticial,
       request: const AdRequest(),
@@ -35,11 +39,16 @@ class InterstitialAdManager {
   /// Decide si corresponde intersticial para este partido y, si aplica,
   /// lo muestra. [alTerminar] se llama siempre al final (haya habido
   /// anuncio o no), para recién ahí navegar al detalle.
+  ///
+  /// [esPro] indica si el PARTIDO es de contenido Pro (requiere pago).
+  /// El estado Pro del USUARIO se lee directo de [esProNotifier], así
+  /// que si ya pagó la suscripción nunca ve anuncios.
   void mostrarSiCorresponde({
     required bool esPro,
     required VoidCallback alTerminar,
   }) {
-    if (esPro) {
+    // Salta el anuncio si: el partido es Pro, o el usuario ya es Pro.
+    if (esPro || esProNotifier.value) {
       alTerminar();
       return;
     }
