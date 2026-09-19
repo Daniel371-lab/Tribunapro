@@ -1,9 +1,12 @@
 // ==== CONFIGURACIÓN DE LA PREDICCIÓN ====
-// [FIX 4] Pesos rebalanceados: más peso a forma reciente, menos a H2H
+// Pesos: forma más relevante (refleja el momento actual), H2H con menos
+// peso (muestra chica, cambia entre temporadas), tabla como señal dominante.
 const PESO_H2H   = 25;
 const PESO_FORMA = 32;
 const PESO_TABLA = 43;
 
+// Promedios reales del fútbol: local gana ~45%, empate ~26%, visitante ~29%.
+// Se usan solo cuando no hay H2H entre los dos equipos.
 const BASE_LOCAL = 44;
 const BASE_EMPATE = 26;
 const BASE_VISITANTE = 30;
@@ -11,12 +14,13 @@ const BASE_VISITANTE = 30;
 const UMBRAL_EMPATE_TECNICO = 8;
 
 const PROMEDIO_GOLES_LIGA = 1.35;
+// A partir del 5to partido jugado, el promedio del equipo se usa al 100%.
 const PARTIDOS_PARA_CONFIANZA_PLENA = 5;
 
-// [FIX 2] Ventaja de jugar en casa, aplicada al modelo de goles (Poisson)
+// Ventaja de jugar en casa, aplicada al modelo de goles (Poisson).
 const VENTAJA_LOCAL_LAMBDA = 1.15;
 
-// [FIX 3] Pseudo-partidos para suavizar H2H con muestras chicas
+// Pseudo-partidos para suavizar H2H con muestras chicas.
 const H2H_SUAVIZADO_K = 5;
 // =========================================
 
@@ -46,8 +50,8 @@ function puntosDeH2H(h2h, idLocal) {
   const victoriasVisitante = equipoEsLocalEnAgregado ? agregados.awayTeam.wins : agregados.homeTeam.wins;
   const empates = agregados.homeTeam?.draws ?? 0;
 
-  // [FIX 3] Suavizado Laplace: agregamos K pseudo-partidos "neutros" para
-  // evitar que un H2H con 2-3 partidos dispare valores extremos (100%, 0%).
+  // Suavizado Laplace: K pseudo-partidos "neutros" para evitar que un H2H
+  // con pocos partidos dispare valores extremos (100%, 0%).
   const totalSuav = total + 3 * H2H_SUAVIZADO_K;
 
   return {
@@ -108,8 +112,7 @@ function calcularPrediccion({
   } else {
     local = (BASE_LOCAL * PESO_H2H + formaLocalPct * PESO_FORMA + tabla.local * PESO_TABLA) / 100;
     visitante = (BASE_VISITANTE * PESO_H2H + formaVisitantePct * PESO_FORMA + tabla.visitante * PESO_TABLA) / 100;
-    // [FIX 1] Antes era (BASE_EMPATE * PESO_H2H) / 100 → quedaba en ~11.7.
-    // Ahora el empate usa todo su valor base cuando no hay H2H.
+    // Sin H2H, el empate usa todo su valor base.
     empate = BASE_EMPATE;
   }
 
@@ -133,7 +136,6 @@ function calcularPrediccion({
     const gFavorVisita = suavizarPromedio((statsVisitante.golesFavor || 0) / pjV, pjV);
     const gContraVisita = suavizarPromedio((statsVisitante.golesContra || 0) / pjV, pjV);
 
-    // [FIX 2] Aplicamos ventaja local al lambda del equipo local.
     const lambdaLocal = Math.max(0.2, (gFavorLocal * gContraVisita * VENTAJA_LOCAL_LAMBDA) / PROMEDIO_GOLES_LIGA);
     const lambdaVisitante = Math.max(0.2, (gFavorVisita * gContraLocal) / PROMEDIO_GOLES_LIGA);
 
@@ -166,10 +168,6 @@ function calcularPrediccion({
   // Categoría: Resultado
   const brecha = local - visitante;
 
-  // [FIX 5] Umbrales ajustados:
-  //   - "Gana X": brecha 25 (antes 30), empate <= 28 (antes UMBRAL*4 = 32)
-  //   - Doble oportunidad: 70 (antes 65)
-  //   - Empate probable: 30 + debe ser el favorito real (antes 33 sin condición)
   if (brecha >= 25 || (local >= 48 && empate <= 28)) {
     predicciones.push({
       tipo: "resultado",
@@ -215,7 +213,12 @@ function calcularPrediccion({
       texto: "-2.5 goles en el partido",
       criterio: { umbral: 2.5, direccion: "menos" },
     });
-  } else if (probBTTS >= 55 && probOver25 >= 50) {
+  } else if (
+    (probBTTS >= 55 && probOver25 >= 50) ||
+    (probOver25 >= 48) ||
+    (ataqueL + ataqueV >= 2.5) ||
+    (probBTTS >= 50)
+  ) {
     predicciones.push({
       tipo: "goles_totales",
       texto: "+1.5 goles en el partido",
@@ -232,47 +235,47 @@ function calcularPrediccion({
     (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "visitante"
   );
 
-// Categoría: Ambos marcan / marca un equipo puntual
-if (probBTTS >= 60) {
-  predicciones.push({
-    tipo: "ambos_marcan",
-    texto: "Ambos equipos van a marcar",
-    criterio: {},
-  });
-} else {
-  // Evaluamos primero si cada equipo marca por separado.
-  const localMarca =
-    !yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3;
-  const visitanteMarca =
-    !yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3;
-
-  if (localMarca && visitanteMarca) {
-    // Si los dos marcan, se combinan en una sola predicción de "ambos marcan".
+  // Categoría: Ambos marcan / marca un equipo puntual
+  if (probBTTS >= 60) {
     predicciones.push({
       tipo: "ambos_marcan",
       texto: "Ambos equipos van a marcar",
       criterio: {},
     });
   } else {
-    if (localMarca) {
+    // Evaluamos primero si cada equipo marca por separado.
+    const localMarca =
+      !yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3;
+    const visitanteMarca =
+      !yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3;
+
+    if (localMarca && visitanteMarca) {
+      // Si los dos marcan, se combinan en una sola predicción de "ambos marcan".
       predicciones.push({
-        tipo: "gol_equipo",
-        texto: `${nombreLocal} va a marcar`,
-        criterio: { equipo: "local" },
+        tipo: "ambos_marcan",
+        texto: "Ambos equipos van a marcar",
+        criterio: {},
       });
-    }
-    if (visitanteMarca) {
-      predicciones.push({
-        tipo: "gol_equipo",
-        texto: `${nombreVisitante} va a marcar`,
-        criterio: { equipo: "visitante" },
-      });
+    } else {
+      if (localMarca) {
+        predicciones.push({
+          tipo: "gol_equipo",
+          texto: `${nombreLocal} va a marcar`,
+          criterio: { equipo: "local" },
+        });
+      }
+      if (visitanteMarca) {
+        predicciones.push({
+          tipo: "gol_equipo",
+          texto: `${nombreVisitante} va a marcar`,
+          criterio: { equipo: "visitante" },
+        });
+      }
     }
   }
-}
 
-  // [FIX 6] Si la muestra es chica (menos de 5 partidos jugados por algún
-  // equipo), no publicamos predicciones de goles: son ruido puro.
+  // Si la muestra es chica (menos de 5 partidos jugados por algún equipo),
+  // no publicamos predicciones de goles: son ruido puro.
   const prediccionesFiltradas = muestraChica
     ? predicciones.filter((p) => p.tipo !== "goles_totales")
     : predicciones;
