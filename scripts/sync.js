@@ -188,12 +188,26 @@ async function procesarPartidos(matches) {
       });
       nuevos++;
     } else if (!doc.data().finalizado) {
-      // Solo se re-sincronizan datos extra (posición, medio tiempo, escudos)
-      // en partidos que todavía no terminaron.
-      const datos = await datosDelPartido(match);
-      await ref.set({ escudoLocal, escudoVisitante, ...datos }, { merge: true });
+      // IMPORTANTE: acá NO se recalculan predicciones, porcentajes, stats ni H2H.
+      // Todo eso queda congelado desde el momento en que se creó el partido,
+      // para que lo que ve el usuario antes del partido sea exactamente lo
+      // mismo que ve después en el historial.
+      //
+      // Solo se actualizan cosas visuales que podrían haber faltado al
+      // momento de la creación: escudos y medio tiempo.
+      const update = { escudoLocal, escudoVisitante };
+
+      const medioL = match.score?.halfTime?.home;
+      const medioV = match.score?.halfTime?.away;
+      if (medioL != null && medioV != null && doc.data().medioTiempoLocal == null) {
+        update.medioTiempoLocal = medioL;
+        update.medioTiempoVisitante = medioV;
+      }
+
+      await ref.set(update, { merge: true });
       actualizadosExtra++;
     } else {
+      // Partido ya finalizado: solo actualizamos escudos por si cambiaron.
       await ref.set({ escudoLocal, escudoVisitante }, { merge: true });
     }
   }
@@ -215,6 +229,8 @@ async function actualizarResultados(matches) {
     const resultadoReal =
       golesLocal > golesVisitante ? "local" : golesVisitante > golesLocal ? "visitante" : "empate";
 
+    // Lee las predicciones existentes (las congeladas desde la creación)
+    // y solo les asigna el campo `cumplida`. NO las recalcula.
     const predicciones = (doc.data().predicciones || []).map((p) => ({
       ...p,
       cumplida: evaluarPrediccion(p, { resultadoReal, golesLocal, golesVisitante }),

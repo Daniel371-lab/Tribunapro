@@ -1,17 +1,17 @@
 // ==== CONFIGURACIÓN DE LA PREDICCIÓN ====
 // [FIX 4] Pesos rebalanceados: más peso a forma reciente, menos a H2H
-const PESO_H2H   = 35;
-const PESO_FORMA = 25;
-const PESO_TABLA = 40;
+const PESO_H2H   = 25;
+const PESO_FORMA = 32;
+const PESO_TABLA = 43;
 
-const BASE_LOCAL = 40;
+const BASE_LOCAL = 44;
 const BASE_EMPATE = 26;
-const BASE_VISITANTE = 34;
+const BASE_VISITANTE = 30;
 
 const UMBRAL_EMPATE_TECNICO = 8;
 
 const PROMEDIO_GOLES_LIGA = 1.35;
-const PARTIDOS_PARA_CONFIANZA_PLENA = 10;
+const PARTIDOS_PARA_CONFIANZA_PLENA = 5;
 
 // [FIX 2] Ventaja de jugar en casa, aplicada al modelo de goles (Poisson)
 const VENTAJA_LOCAL_LAMBDA = 1.15;
@@ -209,7 +209,7 @@ function calcularPrediccion({
       texto: "+2.5 goles en el partido",
       criterio: { umbral: 2.5, direccion: "mas" },
     });
-  } else if (probOver25 <= 40) {
+  } else if (probOver25 <= 35) {
     predicciones.push({
       tipo: "goles_totales",
       texto: "-2.5 goles en el partido",
@@ -232,22 +232,36 @@ function calcularPrediccion({
     (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "visitante"
   );
 
-  // Categoría: Ambos marcan / marca un equipo puntual
-  if (probBTTS >= 65) {
+// Categoría: Ambos marcan / marca un equipo puntual
+if (probBTTS >= 60) {
+  predicciones.push({
+    tipo: "ambos_marcan",
+    texto: "Ambos equipos van a marcar",
+    criterio: {},
+  });
+} else {
+  // Evaluamos primero si cada equipo marca por separado.
+  const localMarca =
+    !yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3;
+  const visitanteMarca =
+    !yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3;
+
+  if (localMarca && visitanteMarca) {
+    // Si los dos marcan, se combinan en una sola predicción de "ambos marcan".
     predicciones.push({
       tipo: "ambos_marcan",
       texto: "Ambos equipos van a marcar",
       criterio: {},
     });
   } else {
-    if (!yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3) {
+    if (localMarca) {
       predicciones.push({
         tipo: "gol_equipo",
         texto: `${nombreLocal} va a marcar`,
         criterio: { equipo: "local" },
       });
     }
-    if (!yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3) {
+    if (visitanteMarca) {
       predicciones.push({
         tipo: "gol_equipo",
         texto: `${nombreVisitante} va a marcar`,
@@ -255,6 +269,7 @@ function calcularPrediccion({
       });
     }
   }
+}
 
   // [FIX 6] Si la muestra es chica (menos de 5 partidos jugados por algún
   // equipo), no publicamos predicciones de goles: son ruido puro.
