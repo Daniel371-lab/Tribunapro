@@ -13,9 +13,13 @@ const BASE_VISITANTE = 30;
 
 const UMBRAL_EMPATE_TECNICO = 8;
 
+// Valor por defecto cuando la liga todavía no tiene suficientes datos.
 const PROMEDIO_GOLES_LIGA = 1.35;
 // A partir del 5to partido jugado, el promedio del equipo se usa al 100%.
 const PARTIDOS_PARA_CONFIANZA_PLENA = 5;
+// Desde cuántos partidos jugados (mínimo entre ambos equipos) se usa el
+// promedio real de la liga en vez del valor por defecto (1.35).
+const PARTIDOS_MINIMOS_PROMEDIO_REAL = 6;
 
 // Ventaja de jugar en casa, aplicada al modelo de goles (Poisson).
 const VENTAJA_LOCAL_LAMBDA = 1.15;
@@ -35,9 +39,9 @@ function poisson(k, lambda) {
   return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
 }
 
-function suavizarPromedio(promedioReal, partidosJugados) {
+function suavizarPromedio(promedioReal, partidosJugados, promedioLiga) {
   const peso = Math.min(partidosJugados, PARTIDOS_PARA_CONFIANZA_PLENA) / PARTIDOS_PARA_CONFIANZA_PLENA;
-  return promedioReal * peso + PROMEDIO_GOLES_LIGA * (1 - peso);
+  return promedioReal * peso + promedioLiga * (1 - peso);
 }
 
 function puntosDeH2H(h2h, idLocal) {
@@ -90,6 +94,7 @@ function calcularPrediccion({
   nombreVisitante,
   statsLocal,
   statsVisitante,
+  promedioLiga,   // promedio real de la liga (puede ser null)
 }) {
   // ---- 1. Probabilidad 1X2 (esto alimenta la barra de Probabilidades) ----
   const datosH2H = puntosDeH2H(h2h, idLocal);
@@ -130,14 +135,24 @@ function calcularPrediccion({
   const pjV = statsVisitante?.partidosJugados || 0;
   const muestraChica = pjL < 5 || pjV < 5;
 
-  if (pjL > 0 && pjV > 0) {
-    const gFavorLocal = suavizarPromedio((statsLocal.golesFavor || 0) / pjL, pjL);
-    const gContraLocal = suavizarPromedio((statsLocal.golesContra || 0) / pjL, pjL);
-    const gFavorVisita = suavizarPromedio((statsVisitante.golesFavor || 0) / pjV, pjV);
-    const gContraVisita = suavizarPromedio((statsVisitante.golesContra || 0) / pjV, pjV);
+  // Decidimos qué promedio de liga usar:
+  // - Si la liga ya tiene datos suficientes (ambos equipos jugaron 6+),
+  //   usamos el promedio real que viene desde sync.js.
+  // - Si no, usamos el valor por defecto (1.35).
+  const partidosMinimos = Math.min(pjL, pjV);
+  const promedioActivo =
+    (promedioLiga != null && partidosMinimos >= PARTIDOS_MINIMOS_PROMEDIO_REAL)
+      ? promedioLiga
+      : PROMEDIO_GOLES_LIGA;
 
-    const lambdaLocal = Math.max(0.2, (gFavorLocal * gContraVisita * VENTAJA_LOCAL_LAMBDA) / PROMEDIO_GOLES_LIGA);
-    const lambdaVisitante = Math.max(0.2, (gFavorVisita * gContraLocal) / PROMEDIO_GOLES_LIGA);
+  if (pjL > 0 && pjV > 0) {
+    const gFavorLocal = suavizarPromedio((statsLocal.golesFavor || 0) / pjL, pjL, promedioActivo);
+    const gContraLocal = suavizarPromedio((statsLocal.golesContra || 0) / pjL, pjL, promedioActivo);
+    const gFavorVisita = suavizarPromedio((statsVisitante.golesFavor || 0) / pjV, pjV, promedioActivo);
+    const gContraVisita = suavizarPromedio((statsVisitante.golesContra || 0) / pjV, pjV, promedioActivo);
+
+    const lambdaLocal = Math.max(0.2, (gFavorLocal * gContraVisita * VENTAJA_LOCAL_LAMBDA) / promedioActivo);
+    const lambdaVisitante = Math.max(0.2, (gFavorVisita * gContraLocal) / promedioActivo);
 
     ataqueL = gFavorLocal;
     defensaL = gContraLocal;
@@ -168,13 +183,17 @@ function calcularPrediccion({
   // Categoría: Resultado
   const brecha = local - visitante;
 
-  if (brecha >= 25 || (local >= 48 && empate <= 28)) {
+  // Regla única: "Gana X" solo se dispara cuando la diferencia entre
+  // local y visitante es de 25 puntos o más. Se eliminó la condición
+  // alternativa (favorito >= 48 con empate bajo) porque en la muestra
+  // analizada no aportó ningún acierto y sí varios fallos.
+  if (brecha >= 25) {
     predicciones.push({
       tipo: "resultado",
       texto: `Gana ${nombreLocal}`,
       criterio: { resultados: ["local"] },
     });
-  } else if (-brecha >= 25 || (visitante >= 48 && empate <= 28)) {
+  } else if (-brecha >= 25) {
     predicciones.push({
       tipo: "resultado",
       texto: `Gana ${nombreVisitante}`,
@@ -201,7 +220,14 @@ function calcularPrediccion({
   }
 
   // Categoría: Goles totales del partido
-  if (probOver25 >= 60) {
+  // Filtro compuesto: bloqueamos +2.5 solo si las defensas son malas Y los
+  // ataques son bajos. Con defensas malas pero ataques buenos, dejamos pasar
+  // porque el partido probablemente sí tenga goles.
+  const defensasMalas = (defensaL + defensaV) > 4.0;
+  const ataquesBajos = (ataqueL + ataqueV) < 3.5;
+  const partidoCerrado = defensasMalas && ataquesBajos;
+
+  if (probOver25 >= 60 && !partidoCerrado) {
     predicciones.push({
       tipo: "goles_totales",
       texto: "+2.5 goles en el partido",

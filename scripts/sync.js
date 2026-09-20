@@ -37,6 +37,25 @@ async function obtenerTablaCacheada(codigo) {
   }
 }
 
+// Calcula el promedio real de goles por equipo por partido en una liga,
+// usando la tabla completa. Devuelve null si no hay datos suficientes.
+function promedioGolesDeTabla(tabla) {
+  if (!tabla || !tabla.standings) return null;
+  const grupoTotal = tabla.standings.find((s) => s.type === "TOTAL");
+  if (!grupoTotal) return null;
+
+  let totalGoles = 0;
+  let totalPartidos = 0;
+
+  for (const fila of grupoTotal.table) {
+    totalGoles += fila.goalsFor || 0;
+    totalPartidos += fila.playedGames || 0;
+  }
+
+  if (totalPartidos === 0) return null;
+  return totalGoles / totalPartidos;
+}
+
 function statsDeEquipoEnTabla(tabla, equipoId) {
   if (!tabla || !tabla.standings) return null;
   const grupoTotal = tabla.standings.find((s) => s.type === "TOTAL");
@@ -84,6 +103,7 @@ async function datosDelPartido(match) {
   const tabla = await obtenerTablaCacheada(match.competition.code);
   const statsLocal = statsDeEquipoEnTabla(tabla, match.homeTeam.id);
   const statsVisitante = statsDeEquipoEnTabla(tabla, match.awayTeam.id);
+  const promedioLiga = promedioGolesDeTabla(tabla);
 
   const prediccion = calcularPrediccion({
     h2h,
@@ -97,6 +117,7 @@ async function datosDelPartido(match) {
     nombreVisitante: match.awayTeam.name,
     statsLocal,
     statsVisitante,
+    promedioLiga,
   });
 
   const h2hDatos = (h2h?.matches ?? [])
