@@ -187,7 +187,7 @@ function calcularPrediccion({
   // local y visitante es de 25 puntos o más. Se eliminó la condición
   // alternativa (favorito >= 48 con empate bajo) porque en la muestra
   // analizada no aportó ningún acierto y sí varios fallos.
-  if (brecha >= 25) {
+  if (brecha >= 33) {
     predicciones.push({
       tipo: "resultado",
       texto: `Gana ${nombreLocal}`,
