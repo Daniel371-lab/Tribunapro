@@ -120,6 +120,23 @@ async function datosDelPartido(match) {
     promedioLiga,
   });
 
+  // ===== LOG DE DEBUG TEMPORAL =====
+  // Solo se imprime para Eredivisie (DED). Sirve para diagnosticar por qué
+  // el partido Feyenoord vs Utrecht dio -2.5 en vez de +2.5.
+  // Sacar este bloque cuando terminemos el diagnóstico.
+  if (match.competition.code === "DED") {
+    const pjL = statsLocal?.partidosJugados ?? 0;
+    const pjV = statsVisitante?.partidosJugados ?? 0;
+    console.log(`[DED] ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+    console.log(`  promedioLiga calculado: ${promedioLiga}`);
+    console.log(`  statsLocal: PJ=${pjL} GF=${statsLocal?.golesFavor} GC=${statsLocal?.golesContra}`);
+    console.log(`  statsVisitante: PJ=${pjV} GF=${statsVisitante?.golesFavor} GC=${statsVisitante?.golesContra}`);
+    console.log(`  porcentajes barra: L=${prediccion.porcentajeLocal} E=${prediccion.porcentajeEmpate} V=${prediccion.porcentajeVisitante}`);
+    console.log(`  predicciones: ${prediccion.predicciones.map((p) => p.texto).join(" | ")}`);
+    console.log("---");
+  }
+  // ===== FIN LOG DE DEBUG =====
+
   const h2hDatos = (h2h?.matches ?? [])
     .slice(0, 5)
     .map((p) => ({
@@ -162,10 +179,6 @@ async function procesarPartidos(matches) {
       const datos = await datosDelPartido(match);
       const { nombre, tipo } = datosCompetencia(match.competition.code);
 
-      // Si el partido ya terminó cuando lo creamos por primera vez,
-      // lo dejamos finalizado desde el arranque, con resultado y
-      // predicciones ya evaluadas. Esto evita partidos "fantasma"
-      // que existen en Firestore pero nunca se marcan como finalizados.
       const yaFinalizo = match.status === "FINISHED";
       const golesLocal = match.score?.fullTime?.home ?? null;
       const golesVisitante = match.score?.fullTime?.away ?? null;
@@ -209,13 +222,6 @@ async function procesarPartidos(matches) {
       });
       nuevos++;
     } else if (!doc.data().finalizado) {
-      // IMPORTANTE: acá NO se recalculan predicciones, porcentajes, stats ni H2H.
-      // Todo eso queda congelado desde el momento en que se creó el partido,
-      // para que lo que ve el usuario antes del partido sea exactamente lo
-      // mismo que ve después en el historial.
-      //
-      // Solo se actualizan cosas visuales que podrían haber faltado al
-      // momento de la creación: escudos y medio tiempo.
       const update = { escudoLocal, escudoVisitante };
 
       const medioL = match.score?.halfTime?.home;
@@ -228,7 +234,6 @@ async function procesarPartidos(matches) {
       await ref.set(update, { merge: true });
       actualizadosExtra++;
     } else {
-      // Partido ya finalizado: solo actualizamos escudos por si cambiaron.
       await ref.set({ escudoLocal, escudoVisitante }, { merge: true });
     }
   }
@@ -250,8 +255,6 @@ async function actualizarResultados(matches) {
     const resultadoReal =
       golesLocal > golesVisitante ? "local" : golesVisitante > golesLocal ? "visitante" : "empate";
 
-    // Lee las predicciones existentes (las congeladas desde la creación)
-    // y solo les asigna el campo `cumplida`. NO las recalcula.
     const predicciones = (doc.data().predicciones || []).map((p) => ({
       ...p,
       cumplida: evaluarPrediccion(p, { resultadoReal, golesLocal, golesVisitante }),
@@ -311,10 +314,6 @@ async function main() {
     console.log("La API no devolvió partidos en este rango de fechas.");
   }
 
-  // ORDEN CORRECTO:
-  // 1) Primero creamos/actualizamos la base de cada partido.
-  //    Si un partido llega ya finalizado, se crea finalizado de una.
-  // 2) Después actualizamos resultados de los que quedaron pendientes.
   const { nuevos, actualizadosExtra } = await procesarPartidos(partidos);
   const actualizadosResultados = await actualizarResultados(partidos);
   const borrados = await purgarVencidos();

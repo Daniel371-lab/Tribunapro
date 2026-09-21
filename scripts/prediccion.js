@@ -187,19 +187,26 @@ function calcularPrediccion({
   // local y visitante es de 25 puntos o más. Se eliminó la condición
   // alternativa (favorito >= 48 con empate bajo) porque en la muestra
   // analizada no aportó ningún acierto y sí varios fallos.
-  if (brecha >= 33) {
-    predicciones.push({
-      tipo: "resultado",
-      texto: `Gana ${nombreLocal}`,
-      criterio: { resultados: ["local"] },
-    });
-  } else if (-brecha >= 25) {
-    predicciones.push({
-      tipo: "resultado",
-      texto: `Gana ${nombreVisitante}`,
-      criterio: { resultados: ["visitante"] },
-    });
-  } else if (local + empate >= 70) {
+  // Solo mostramos "Gana X" directo cuando ambos equipos ya jugaron al
+// menos 6 partidos. Antes de eso, la tabla y los promedios son ruido
+// y predecir un ganador seco es más azaroso que útil. Si no dispara
+// "Gana X" por falta de datos, la cascada sigue y puede caer en
+// "Doble oportunidad" o "Empate probable".
+const tieneDatosSuficientes = pjL >= 6 && pjV >= 6;
+
+if (tieneDatosSuficientes && brecha >= 33) {
+  predicciones.push({
+    tipo: "resultado",
+    texto: `Gana ${nombreLocal}`,
+    criterio: { resultados: ["local"] },
+  });
+} else if (tieneDatosSuficientes && -brecha >= 25) {
+  predicciones.push({
+    tipo: "resultado",
+    texto: `Gana ${nombreVisitante}`,
+    criterio: { resultados: ["visitante"] },
+  });
+} else if (local + empate >= 70) {
     predicciones.push({
       tipo: "resultado",
       texto: `Doble oportunidad ${nombreLocal} o empate`,
