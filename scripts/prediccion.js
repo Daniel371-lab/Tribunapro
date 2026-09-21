@@ -173,9 +173,15 @@ function calcularPrediccion({
       }
     }
 
-    probOver25 = Math.round(probOver25Sum * 100);
-    probBTTS = Math.round(probBTTSSum * 100);
-  }
+  probOver25 = Math.round(probOver25Sum * 100);
+  probBTTS = Math.round(probBTTSSum * 100);
+}
+    console.log(`  lambdaLocal: ${lambdaLocal}`);
+console.log(`  lambdaVisitante: ${lambdaVisitante}`);
+console.log(`  probOver25Sum: ${probOver25Sum}`);
+console.log(`  probOver25 (final): ${probOver25}`);
+console.log(`  probBTTS (final): ${probBTTS}`);
+ 
 
   // ---- 3. Armado de la lista de predicciones (solo se agregan si hay confianza) ----
   const predicciones = [];
