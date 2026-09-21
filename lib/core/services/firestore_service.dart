@@ -43,7 +43,7 @@ class FirestoreService {
             .toList());
   }
 
-  Stream<List<Partido>> historial({int limite = 30}) {
+  Stream<List<Partido>> historial({int limite = 150}) {
     return _partidos
         .where('publicado', isEqualTo: true)
         .where('finalizado', isEqualTo: true)
