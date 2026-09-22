@@ -279,7 +279,7 @@ async function purgarVencidos() {
 async function main() {
   const hoy = new Date();
   const ayer = new Date(hoy);
-  ayer.setDate(ayer.getDate() - 1);
+  ayer.setDate(ayer.getDate() - 3);
   const dentroDeDosDias = new Date(hoy);
   dentroDeDosDias.setDate(dentroDeDosDias.getDate() + 2);
 
