@@ -141,11 +141,19 @@ function calcularPrediccion({
     ataqueV = gFavorVisita;
     defensaV = gContraVisita;
 
+    // El límite del loop depende del lambda. Cuando lambda es alto (muchos
+    // goles esperados), hay que sumar más marcadores o se pierde
+    // probabilidad y el modelo da resultados absurdos (por ejemplo, -2.5
+    // cuando el total esperado es 8 goles). Se calcula como
+    // lambda + 5*√lambda, con tope de 20 para no explotar el cómputo.
+    const limiteL = Math.min(20, Math.ceil(lambdaLocal + 5 * Math.sqrt(lambdaLocal)));
+    const limiteV = Math.min(20, Math.ceil(lambdaVisitante + 5 * Math.sqrt(lambdaVisitante)));
+
     let probOver25Sum = 0;
     let probBTTSSum = 0;
 
-    for (let gL = 0; gL <= 5; gL++) {
-      for (let gV = 0; gV <= 5; gV++) {
+    for (let gL = 0; gL <= limiteL; gL++) {
+      for (let gV = 0; gV <= limiteV; gV++) {
         const pL = poisson(gL, lambdaLocal);
         const pV = poisson(gV, lambdaVisitante);
         const pMarcador = pL * pV;
@@ -157,18 +165,6 @@ function calcularPrediccion({
 
     probOver25 = Math.round(probOver25Sum * 100);
     probBTTS = Math.round(probBTTSSum * 100);
-
-    // ===== LOGS DE DEBUG TEMPORALES =====
-    // Sacar cuando terminemos el diagnóstico del bug de -2.5.
-    console.log(`  promedioActivo: ${promedioActivo}`);
-    console.log(`  gFavorLocal: ${gFavorLocal} | gContraLocal: ${gContraLocal}`);
-    console.log(`  gFavorVisita: ${gFavorVisita} | gContraVisita: ${gContraVisita}`);
-    console.log(`  lambdaLocal: ${lambdaLocal}`);
-    console.log(`  lambdaVisitante: ${lambdaVisitante}`);
-    console.log(`  probOver25Sum: ${probOver25Sum}`);
-    console.log(`  probOver25 (final): ${probOver25}`);
-    console.log(`  probBTTS (final): ${probBTTS}`);
-    // ===== FIN LOGS DE DEBUG =====
   }
 
   // ---- 3. Armado de la lista de predicciones ----

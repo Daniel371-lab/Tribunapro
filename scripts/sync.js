@@ -120,23 +120,6 @@ async function datosDelPartido(match) {
     promedioLiga,
   });
 
-  // ===== LOG DE DEBUG TEMPORAL =====
-  // Solo se imprime para Eredivisie (DED). Sirve para diagnosticar por qué
-  // el partido Feyenoord vs Utrecht dio -2.5 en vez de +2.5.
-  // Sacar este bloque cuando terminemos el diagnóstico.
-  if (match.competition.code === "DED") {
-    const pjL = statsLocal?.partidosJugados ?? 0;
-    const pjV = statsVisitante?.partidosJugados ?? 0;
-    console.log(`[DED] ${match.homeTeam.name} vs ${match.awayTeam.name}`);
-    console.log(`  promedioLiga calculado: ${promedioLiga}`);
-    console.log(`  statsLocal: PJ=${pjL} GF=${statsLocal?.golesFavor} GC=${statsLocal?.golesContra}`);
-    console.log(`  statsVisitante: PJ=${pjV} GF=${statsVisitante?.golesFavor} GC=${statsVisitante?.golesContra}`);
-    console.log(`  porcentajes barra: L=${prediccion.porcentajeLocal} E=${prediccion.porcentajeEmpate} V=${prediccion.porcentajeVisitante}`);
-    console.log(`  predicciones: ${prediccion.predicciones.map((p) => p.texto).join(" | ")}`);
-    console.log("---");
-  }
-  // ===== FIN LOG DE DEBUG =====
-
   const h2hDatos = (h2h?.matches ?? [])
     .slice(0, 5)
     .map((p) => ({
@@ -222,6 +205,8 @@ async function procesarPartidos(matches) {
       });
       nuevos++;
     } else if (!doc.data().finalizado) {
+      // IMPORTANTE: acá NO se recalculan predicciones, porcentajes, stats ni H2H.
+      // Todo eso queda congelado desde el momento en que se creó el partido.
       const update = { escudoLocal, escudoVisitante };
 
       const medioL = match.score?.halfTime?.home;
@@ -324,11 +309,7 @@ async function main() {
 }
 
 main()
-  .then(() => {
-    // No forzamos process.exit(): Node cierra solo cuando no quedan handles
-    // abiertos, y así evitamos que se trunque el output de los console.log
-    // en CI (bug conocido de Node en GitHub Actions).
-  })
+  .then(() => {})
   .catch((err) => {
     console.error("ERROR en sync.js:", err);
     process.exitCode = 1;
