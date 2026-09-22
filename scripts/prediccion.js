@@ -1,30 +1,19 @@
 // ==== CONFIGURACIÓN DE LA PREDICCIÓN ====
-// Pesos: forma más relevante (refleja el momento actual), H2H con menos
-// peso (muestra chica, cambia entre temporadas), tabla como señal dominante.
 const PESO_H2H   = 25;
 const PESO_FORMA = 32;
 const PESO_TABLA = 43;
 
-// Promedios reales del fútbol: local gana ~45%, empate ~26%, visitante ~29%.
-// Se usan solo cuando no hay H2H entre los dos equipos.
 const BASE_LOCAL = 44;
 const BASE_EMPATE = 26;
 const BASE_VISITANTE = 30;
 
 const UMBRAL_EMPATE_TECNICO = 8;
 
-// Valor por defecto cuando la liga todavía no tiene suficientes datos.
 const PROMEDIO_GOLES_LIGA = 1.35;
-// A partir del 5to partido jugado, el promedio del equipo se usa al 100%.
 const PARTIDOS_PARA_CONFIANZA_PLENA = 5;
-// Desde cuántos partidos jugados (mínimo entre ambos equipos) se usa el
-// promedio real de la liga en vez del valor por defecto (1.35).
 const PARTIDOS_MINIMOS_PROMEDIO_REAL = 6;
 
-// Ventaja de jugar en casa, aplicada al modelo de goles (Poisson).
 const VENTAJA_LOCAL_LAMBDA = 1.15;
-
-// Pseudo-partidos para suavizar H2H con muestras chicas.
 const H2H_SUAVIZADO_K = 5;
 // =========================================
 
@@ -54,8 +43,6 @@ function puntosDeH2H(h2h, idLocal) {
   const victoriasVisitante = equipoEsLocalEnAgregado ? agregados.awayTeam.wins : agregados.homeTeam.wins;
   const empates = agregados.homeTeam?.draws ?? 0;
 
-  // Suavizado Laplace: K pseudo-partidos "neutros" para evitar que un H2H
-  // con pocos partidos dispare valores extremos (100%, 0%).
   const totalSuav = total + 3 * H2H_SUAVIZADO_K;
 
   return {
@@ -94,9 +81,9 @@ function calcularPrediccion({
   nombreVisitante,
   statsLocal,
   statsVisitante,
-  promedioLiga,   // promedio real de la liga (puede ser null)
+  promedioLiga,
 }) {
-  // ---- 1. Probabilidad 1X2 (esto alimenta la barra de Probabilidades) ----
+  // ---- 1. Probabilidad 1X2 ----
   const datosH2H = puntosDeH2H(h2h, idLocal);
   const tieneH2H = datosH2H.total > 0;
 
@@ -117,7 +104,6 @@ function calcularPrediccion({
   } else {
     local = (BASE_LOCAL * PESO_H2H + formaLocalPct * PESO_FORMA + tabla.local * PESO_TABLA) / 100;
     visitante = (BASE_VISITANTE * PESO_H2H + formaVisitantePct * PESO_FORMA + tabla.visitante * PESO_TABLA) / 100;
-    // Sin H2H, el empate usa todo su valor base.
     empate = BASE_EMPATE;
   }
 
@@ -126,7 +112,7 @@ function calcularPrediccion({
   empate = Math.round((empate / suma) * 100);
   visitante = 100 - local - empate;
 
-  // ---- 2. Goles esperados con distribución de Poisson ----
+  // ---- 2. Goles esperados con Poisson ----
   let probOver25 = 50;
   let probBTTS = 50;
   let ataqueL = 1.0, defensaV = 1.0;
@@ -135,10 +121,6 @@ function calcularPrediccion({
   const pjV = statsVisitante?.partidosJugados || 0;
   const muestraChica = pjL < 5 || pjV < 5;
 
-  // Decidimos qué promedio de liga usar:
-  // - Si la liga ya tiene datos suficientes (ambos equipos jugaron 6+),
-  //   usamos el promedio real que viene desde sync.js.
-  // - Si no, usamos el valor por defecto (1.35).
   const partidosMinimos = Math.min(pjL, pjV);
   const promedioActivo =
     (promedioLiga != null && partidosMinimos >= PARTIDOS_MINIMOS_PROMEDIO_REAL)
@@ -173,46 +155,39 @@ function calcularPrediccion({
       }
     }
 
-  probOver25 = Math.round(probOver25Sum * 100);
-  probBTTS = Math.round(probBTTSSum * 100);
-}
+    probOver25 = Math.round(probOver25Sum * 100);
+    probBTTS = Math.round(probBTTSSum * 100);
+
+    // ===== LOGS DE DEBUG TEMPORALES =====
+    // Sacar cuando terminemos el diagnóstico del bug de -2.5.
+    console.log(`  promedioActivo: ${promedioActivo}`);
+    console.log(`  gFavorLocal: ${gFavorLocal} | gContraLocal: ${gContraLocal}`);
+    console.log(`  gFavorVisita: ${gFavorVisita} | gContraVisita: ${gContraVisita}`);
     console.log(`  lambdaLocal: ${lambdaLocal}`);
-console.log(`  lambdaVisitante: ${lambdaVisitante}`);
-console.log(`  probOver25Sum: ${probOver25Sum}`);
-console.log(`  probOver25 (final): ${probOver25}`);
-console.log(`  probBTTS (final): ${probBTTS}`);
- 
+    console.log(`  lambdaVisitante: ${lambdaVisitante}`);
+    console.log(`  probOver25Sum: ${probOver25Sum}`);
+    console.log(`  probOver25 (final): ${probOver25}`);
+    console.log(`  probBTTS (final): ${probBTTS}`);
+    // ===== FIN LOGS DE DEBUG =====
+  }
 
-  // ---- 3. Armado de la lista de predicciones (solo se agregan si hay confianza) ----
+  // ---- 3. Armado de la lista de predicciones ----
   const predicciones = [];
-
-  // Categoría: Resultado
   const brecha = local - visitante;
 
-  // Regla única: "Gana X" solo se dispara cuando la diferencia entre
-  // local y visitante es de 25 puntos o más. Se eliminó la condición
-  // alternativa (favorito >= 48 con empate bajo) porque en la muestra
-  // analizada no aportó ningún acierto y sí varios fallos.
-  // Solo mostramos "Gana X" directo cuando ambos equipos ya jugaron al
-// menos 6 partidos. Antes de eso, la tabla y los promedios son ruido
-// y predecir un ganador seco es más azaroso que útil. Si no dispara
-// "Gana X" por falta de datos, la cascada sigue y puede caer en
-// "Doble oportunidad" o "Empate probable".
-const tieneDatosSuficientes = pjL >= 6 && pjV >= 6;
-
-if (tieneDatosSuficientes && brecha >= 33) {
-  predicciones.push({
-    tipo: "resultado",
-    texto: `Gana ${nombreLocal}`,
-    criterio: { resultados: ["local"] },
-  });
-} else if (tieneDatosSuficientes && -brecha >= 25) {
-  predicciones.push({
-    tipo: "resultado",
-    texto: `Gana ${nombreVisitante}`,
-    criterio: { resultados: ["visitante"] },
-  });
-} else if (local + empate >= 70) {
+  if (brecha >= 25) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Gana ${nombreLocal}`,
+      criterio: { resultados: ["local"] },
+    });
+  } else if (-brecha >= 25) {
+    predicciones.push({
+      tipo: "resultado",
+      texto: `Gana ${nombreVisitante}`,
+      criterio: { resultados: ["visitante"] },
+    });
+  } else if (local + empate >= 70) {
     predicciones.push({
       tipo: "resultado",
       texto: `Doble oportunidad ${nombreLocal} o empate`,
@@ -232,10 +207,7 @@ if (tieneDatosSuficientes && brecha >= 33) {
     });
   }
 
-  // Categoría: Goles totales del partido
-  // Filtro compuesto: bloqueamos +2.5 solo si las defensas son malas Y los
-  // ataques son bajos. Con defensas malas pero ataques buenos, dejamos pasar
-  // porque el partido probablemente sí tenga goles.
+  // Categoría: Goles totales
   const defensasMalas = (defensaL + defensaV) > 4.0;
   const ataquesBajos = (ataqueL + ataqueV) < 3.5;
   const partidoCerrado = defensasMalas && ataquesBajos;
@@ -265,8 +237,7 @@ if (tieneDatosSuficientes && brecha >= 33) {
     });
   }
 
-  // Si ya dijimos "Gana X" en la categoría de Resultado, no tiene sentido
-  // repetir "X va a marcar" por separado — va implícito en que ganó.
+  // Si ya dijimos "Gana X", no repetimos "X va a marcar"
   const yaGanaLocal = predicciones.some(
     (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "local"
   );
@@ -282,14 +253,12 @@ if (tieneDatosSuficientes && brecha >= 33) {
       criterio: {},
     });
   } else {
-    // Evaluamos primero si cada equipo marca por separado.
     const localMarca =
       !yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3;
     const visitanteMarca =
       !yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3;
 
     if (localMarca && visitanteMarca) {
-      // Si los dos marcan, se combinan en una sola predicción de "ambos marcan".
       predicciones.push({
         tipo: "ambos_marcan",
         texto: "Ambos equipos van a marcar",
@@ -313,8 +282,7 @@ if (tieneDatosSuficientes && brecha >= 33) {
     }
   }
 
-  // Si la muestra es chica (menos de 5 partidos jugados por algún equipo),
-  // no publicamos predicciones de goles: son ruido puro.
+  // Filtro muestra chica
   const prediccionesFiltradas = muestraChica
     ? predicciones.filter((p) => p.tipo !== "goles_totales")
     : predicciones;
