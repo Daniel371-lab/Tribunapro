@@ -32,29 +32,30 @@ class _PartidoDetailScreenState extends State<PartidoDetailScreen> {
       _mostrarModalSiCorresponde();
     });
   }
+Future<void> _mostrarModalSiCorresponde() async {
+  if (!mounted) return;
+  // Solo lo mostramos en partidos NO finalizados (pre-partido).
+  // En el historial no debe aparecer.
+  if (partido.finalizado) return;
 
-  Future<void> _mostrarModalSiCorresponde() async {
-    if (!mounted) return;
-    await ModalPrimeraVisita.mostrar(
-      context,
-      onSerPro: () {
-        if (!mounted) return;
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ModoProScreen()),
-        );
-      },
-      onVer5Anuncios: () {
-        // Le pedimos al usuario que vaya a Ajustes para ver los 5 anuncios.
-        // El botón real vive ahí, junto con el resto de la gestión de Pro.
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Andá a Ajustes → Ver 5 anuncios para desbloquear 24h'),
-          ),
-        );
-      },
-    );
-  }
+  await ModalPrimeraVisita.mostrar(
+    context,
+    onSerPro: () {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ModoProScreen()),
+      );
+    },
+    onVer5Anuncios: () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ve a Ajustes → Ver 5 anuncios para desbloquear 24h'),
+        ),
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {

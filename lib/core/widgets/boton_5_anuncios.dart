@@ -6,11 +6,9 @@ import '../services/pro_temporal_service.dart';
 /// Botón que gestiona la secuencia de 5 anuncios recompensados.
 /// El usuario ve uno, vuelve a la app, toca "Siguiente", y así hasta 5.
 /// Si completa los 5, se activa el Pro temporal por 24 horas.
-/// Si abandona en el medio (cierra la app, sale de la pantalla, etc.),
-/// el progreso se pierde y arranca de cero la próxima vez.
+/// Si abandona en el medio, el progreso se pierde y arranca de cero.
 class Boton5Anuncios extends StatefulWidget {
-  /// Estilo del botón: "filled" (relleno, para bloqueo pro) o
-  /// "outlined" (borde, para ajustes).
+  /// Estilo: true = relleno, false = borde.
   final bool relleno;
 
   const Boton5Anuncios({super.key, this.relleno = true});
@@ -47,7 +45,7 @@ class _Boton5AnunciosState extends State<Boton5Anuncios> {
             });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('¡Listo! Vas a ver los partidos Pro por 24 horas.'),
+                content: Text('Listo. Vas a ver los partidos Pro por 24 horas.'),
               ),
             );
           }
@@ -58,7 +56,7 @@ class _Boton5AnunciosState extends State<Boton5Anuncios> {
       onNoDisponible: () {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('El anuncio no está disponible, probá de nuevo en un momento.')),
+          const SnackBar(content: Text('El anuncio no está disponible. Intenta de nuevo en un momento.')),
         );
       },
     );
@@ -95,10 +93,9 @@ class _Boton5AnunciosState extends State<Boton5Anuncios> {
       );
     }
 
-    // Texto según el progreso
     final String texto;
     if (_progreso == 0) {
-      texto = 'Ver 5 anuncios y desbloquear 24h';
+      texto = 'Desbloquear 24h con 5 anuncios';
     } else {
       texto = 'Siguiente anuncio ($_progreso/5)';
     }
@@ -113,10 +110,10 @@ class _Boton5AnunciosState extends State<Boton5Anuncios> {
         child: FilledButton.icon(
           onPressed: _continuarSecuencia,
           icon: Icon(icono, size: 18),
-          label: Text(texto),
+          label: FittedBox(fit: BoxFit.scaleDown, child: Text(texto)),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.pro,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -128,9 +125,9 @@ class _Boton5AnunciosState extends State<Boton5Anuncios> {
       child: OutlinedButton.icon(
         onPressed: _continuarSecuencia,
         icon: Icon(icono, size: 18),
-        label: Text(texto),
+        label: FittedBox(fit: BoxFit.scaleDown, child: Text(texto)),
         style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),

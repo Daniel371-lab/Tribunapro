@@ -2,16 +2,11 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../services/pro_temporal_service.dart';
 
-/// Modal que se muestra UNA sola vez, la primera vez que el usuario
-/// abre un partido. Ofrece 2 caminos: hacerse Pro (pago) o ver 5
-/// anuncios para desbloquear los partidos Pro por 24 horas.
+/// Modal que se muestra la PRIMERA vez que el usuario abre un partido
+/// en esta sesión de app. Se resetea al cerrar y reabrir la app.
+/// NO se muestra si el usuario ya vio algún partido en esta sesión.
 class ModalPrimeraVisita extends StatelessWidget {
-  /// Se llama cuando el usuario toca "Hacerme Pro". El caller debe navegar
-  /// a ModoProScreen.
   final VoidCallback onSerPro;
-
-  /// Se llama cuando el usuario toca "Ver 5 anuncios". El caller debe
-  /// abrir el flujo de los 5 anuncios.
   final VoidCallback onVer5Anuncios;
 
   const ModalPrimeraVisita({
@@ -20,18 +15,19 @@ class ModalPrimeraVisita extends StatelessWidget {
     required this.onVer5Anuncios,
   });
 
+  /// Muestra el modal si corresponde (no se mostró todavía en esta sesión).
+  /// Al terminar (por cualquier vía), marca el flag en memoria.
   static Future<void> mostrar(
     BuildContext context, {
     required VoidCallback onSerPro,
     required VoidCallback onVer5Anuncios,
   }) async {
-    // Si ya lo vio antes, no mostramos nada.
-    final yaVisto = await ProTemporalService.instance.yaVioModalPrimeraVez();
-    if (!context.mounted || yaVisto) return;
+    // Ya se mostró en esta sesión de app
+    if (ProTemporalService.instance.modalMostradoEstaSesion) return;
 
-    // Marcamos como visto ANTES de mostrar el modal. Así, si el usuario
-    // cierra la app sin cerrar el modal, no se le vuelve a mostrar.
-    await ProTemporalService.instance.marcarModalPrimeraVezVisto();
+    // Marcamos ANTES de mostrar, por si el usuario cierra la app con el
+    // modal abierto. Igual, como es en memoria, se resetea al reabrir.
+    ProTemporalService.instance.marcarModalMostradoEstaSesion();
 
     if (!context.mounted) return;
 
@@ -81,18 +77,18 @@ class ModalPrimeraVisita extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Bienvenido a Tribuna Pro',
+                  'Tribuna Pro',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: textoPrincipal,
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
-                  'Elegí cómo querés disfrutar la app. Podés ver todos los partidos Pro con una de estas dos opciones:',
+                  'Elige cómo prefieres ver los partidos Pro:',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, height: 1.45, color: textoSecundario),
                 ),
@@ -102,7 +98,10 @@ class ModalPrimeraVisita extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onSerPro,
                     icon: const Icon(Icons.workspace_premium_rounded, size: 18),
-                    label: const Text('Hacerme Pro'),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Hacerme Pro'),
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.pro,
                       padding: const EdgeInsets.symmetric(vertical: 13),
@@ -116,9 +115,12 @@ class ModalPrimeraVisita extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onVer5Anuncios,
                     icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                    label: const Text('Ver 5 anuncios para desbloquear 24h'),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Desbloquear 24h con 5 anuncios'),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),

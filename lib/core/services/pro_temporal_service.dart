@@ -12,16 +12,16 @@ class ProTemporalService {
   static final ProTemporalService instance = ProTemporalService._();
 
   static const _keyVencimiento = 'pro_temporal_vencimiento_ms';
-  static const _keyModalPrimeraVez = 'modal_primera_visita_visto';
 
   /// Notifica en vivo si el Pro temporal está activo o no. La pantalla
   /// del detalle de partido lo escucha para mostrar las predicciones
   /// cuando el usuario vuelve de ver los 5 anuncios.
   final ValueNotifier<bool> proTemporalActivo = ValueNotifier<bool>(false);
 
-  /// Lee el estado desde SharedPreferences y actualiza el notifier.
-  /// Se llama al iniciar la app y cada vez que volvemos del flujo
-  /// de 5 anuncios.
+  /// Flag en memoria: si el modal de bienvenida ya se mostró en esta
+  /// sesión de app. Se resetea cada vez que el usuario abre la app.
+  bool _modalMostradoEstaSesion = false;
+
   Future<void> refrescar() async {
     final activo = await estaActivo();
     proTemporalActivo.value = activo;
@@ -49,13 +49,11 @@ class ProTemporalService {
     proTemporalActivo.value = true;
   }
 
-  Future<bool> yaVioModalPrimeraVez() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyModalPrimeraVez) ?? false;
-  }
+  /// ¿El modal de bienvenida ya se mostró en esta sesión de app?
+  bool get modalMostradoEstaSesion => _modalMostradoEstaSesion;
 
-  Future<void> marcarModalPrimeraVezVisto() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyModalPrimeraVez, true);
+  /// Marca el modal como mostrado en esta sesión.
+  void marcarModalMostradoEstaSesion() {
+    _modalMostradoEstaSesion = true;
   }
 }
