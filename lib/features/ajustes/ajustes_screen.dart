@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/app.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/pro_state.dart';
+import '../../core/widgets/boton_5_anuncios.dart';
 import '../login/login_screen.dart';
 import '../login/registro_screen.dart';
 import 'modo_pro_screen.dart';
@@ -121,49 +122,57 @@ class AjustesScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 24),
-// Seccion Cuenta / Acciones
-Padding(
-  padding: const EdgeInsets.only(left: 4, bottom: 8),
-  child: Text(
-    'CUENTA',
-    style: TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1.2,
-      color: textoSecundario,
-    ),
-  ),
-),
-// StreamBuilder para reaccionar en vivo al authStateChanges:
-// evita que el botón quede oculto si el usuario llega a esta
-// pantalla antes de que Firebase restaure la sesión.
-StreamBuilder<User?>(
-  stream: FirebaseAuth.instance.authStateChanges(),
-  builder: (context, snapshot) {
-    final userActual = snapshot.data;
-    final esInvitadoActual = userActual == null || userActual.isAnonymous;
-    return _buildGrupo(
-      superficie: superficie,
-      borde: borde,
-      children: [
-        if (!esInvitadoActual)
-          _item(
-            context,
-            Icons.logout_rounded,
-            'Cerrar sesión',
-            onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
-          ),
-        _item(
-          context,
-          Icons.delete_outline_rounded,
-          'Eliminar cuenta',
-          onTap: () => _confirmarEliminarCuenta(context, textoPrincipal, textoSecundario, superficie),
-          esPeligroso: true,
-        ),
-      ],
-    );
-  },
-),
+
+                  // Seccion Cuenta / Acciones
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'CUENTA',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: textoSecundario,
+                      ),
+                    ),
+                  ),
+                  // Bloque de desbloqueo temporal por 5 anuncios.
+                  // Va aparte del StreamBuilder de auth porque no
+                  // depende de si el usuario está logueado o no.
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: Boton5Anuncios(relleno: false),
+                  ),
+                  // StreamBuilder para reaccionar en vivo al authStateChanges:
+                  // evita que el botón quede oculto si el usuario llega a esta
+                  // pantalla antes de que Firebase restaure la sesión.
+                  StreamBuilder<User?>(
+                    stream: FirebaseAuth.instance.authStateChanges(),
+                    builder: (context, snapshot) {
+                      final userActual = snapshot.data;
+                      final esInvitadoActual = userActual == null || userActual.isAnonymous;
+                      return _buildGrupo(
+                        superficie: superficie,
+                        borde: borde,
+                        children: [
+                          if (!esInvitadoActual)
+                            _item(
+                              context,
+                              Icons.logout_rounded,
+                              'Cerrar sesión',
+                              onTap: () => _confirmarCerrarSesion(context, textoPrincipal, textoSecundario, superficie),
+                            ),
+                          _item(
+                            context,
+                            Icons.delete_outline_rounded,
+                            'Eliminar cuenta',
+                            onTap: () => _confirmarEliminarCuenta(context, textoPrincipal, textoSecundario, superficie),
+                            esPeligroso: true,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
 
                   ValueListenableBuilder<bool>(
                     valueListenable: esAdminNotifier,
@@ -611,92 +620,92 @@ StreamBuilder<User?>(
 
   // ==== VENTANA: Acerca de ====
 
-void _mostrarAcercaDe(BuildContext context) {
-  final esOscuro = Theme.of(context).brightness == Brightness.dark;
-  final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
-  final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
-  final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+  void _mostrarAcercaDe(BuildContext context) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: superficie,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) {
-      return SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 28,
-            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text.rich(
-  TextSpan(
-    children: [
-      TextSpan(
-        text: 'Tribuna ',
-        style: TextStyle(color: textoPrincipal),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: superficie,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      const TextSpan(
-        text: 'Pro',
-        style: TextStyle(color: Color(0xFF890F20)),
-      ),
-    ],
-  ),
-  style: const TextStyle(
-    fontSize: 17,
-    fontWeight: FontWeight.bold,
-  ),
-),
-              const SizedBox(height: 6),
-              Text(
-                'Desarrollado por JPLABS',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: textoSecundario),
-              ),
-              const SizedBox(height: 20),
-ClipOval(
-  child: SizedBox(
-    width: 96,
-    height: 96,
-    child: Image.asset(
-      'assets/icon/app_icon.png',
-      fit: BoxFit.cover,
-    ),
-  ),
-),
-const SizedBox(height: 12),
-              Text(
-                'Versión 1.0.0',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.acento,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 28,
+              bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Tribuna ',
+                        style: TextStyle(color: textoPrincipal),
+                      ),
+                      const TextSpan(
+                        text: 'Pro',
+                        style: TextStyle(color: Color(0xFF890F20)),
+                      ),
+                    ],
                   ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Entendido'),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  'Desarrollado por JPLABS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: textoSecundario),
+                ),
+                const SizedBox(height: 20),
+                ClipOval(
+                  child: SizedBox(
+                    width: 96,
+                    height: 96,
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Versión 1.0.0',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textoSecundario),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.acento,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Entendido'),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   // ==== VENTANA: Calificar la app ====
 
@@ -738,18 +747,18 @@ const SizedBox(height: 12),
                 ),
                 const SizedBox(height: 16),
                 Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: List.generate(
-    5,
-    (index) => GestureDetector(
-      onTap: () {
-        Navigator.of(context).pop();
-        _abrirPlayStore();
-      },
-      child: const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
-    ),
-  ),
-),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    5,
+                    (index) => GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _abrirPlayStore();
+                      },
+                      child: const Icon(Icons.star_rounded, color: AppColors.acento, size: 32),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,

@@ -10,6 +10,7 @@ import 'core/services/usuario_state.dart';
 import 'core/services/compras_service.dart';
 import 'core/services/admin_state.dart';
 import 'core/ads/rewarded_ad_manager.dart';
+import 'core/services/pro_temporal_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

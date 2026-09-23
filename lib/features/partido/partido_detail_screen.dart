@@ -2,14 +2,59 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/pro_state.dart';
+import '../../core/services/pro_temporal_service.dart';
 import '../../core/services/usuario_state.dart';
+import '../../core/widgets/modal_primera_visita.dart';
+import '../ajustes/modo_pro_screen.dart';
 import '../dashboard/widgets/escudo_imagen.dart';
 import '_bloqueo_pro_card.dart';
 
-class PartidoDetailScreen extends StatelessWidget {
+class PartidoDetailScreen extends StatefulWidget {
   final Partido partido;
 
   const PartidoDetailScreen({super.key, required this.partido});
+
+  @override
+  State<PartidoDetailScreen> createState() => _PartidoDetailScreenState();
+}
+
+class _PartidoDetailScreenState extends State<PartidoDetailScreen> {
+  Partido get partido => widget.partido;
+
+  @override
+  void initState() {
+    super.initState();
+    // Refrescamos el estado del Pro temporal al abrir la pantalla.
+    ProTemporalService.instance.refrescar();
+    // Mostramos el modal de primera visita (si corresponde) después de
+    // que la pantalla esté montada.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mostrarModalSiCorresponde();
+    });
+  }
+
+  Future<void> _mostrarModalSiCorresponde() async {
+    if (!mounted) return;
+    await ModalPrimeraVisita.mostrar(
+      context,
+      onSerPro: () {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ModoProScreen()),
+        );
+      },
+      onVer5Anuncios: () {
+        // Le pedimos al usuario que vaya a Ajustes para ver los 5 anuncios.
+        // El botón real vive ahí, junto con el resto de la gestión de Pro.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Andá a Ajustes → Ver 5 anuncios para desbloquear 24h'),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,30 +161,36 @@ class PartidoDetailScreen extends StatelessWidget {
         return ValueListenableBuilder<Set<String>>(
           valueListenable: UsuarioState.instance.partidosDesbloqueados,
           builder: (context, desbloqueados, __) {
-            final bloqueado = partido.esPro &&
-                !partido.finalizado &&
-                !esPro &&
-                !desbloqueados.contains(partido.id);
+            return ValueListenableBuilder<bool>(
+              valueListenable: ProTemporalService.instance.proTemporalActivo,
+              builder: (context, proTemporal, ___) {
+                final bloqueado = partido.esPro &&
+                    !partido.finalizado &&
+                    !esPro &&
+                    !desbloqueados.contains(partido.id) &&
+                    !proTemporal;
 
-            if (bloqueado) {
-              return BloqueoProCard(partido: partido);
-            }
+                if (bloqueado) {
+                  return BloqueoProCard(partido: partido);
+                }
 
-            if (partido.predicciones == null || partido.predicciones!.isEmpty) {
-              return const SizedBox.shrink();
-            }
+                if (partido.predicciones == null || partido.predicciones!.isEmpty) {
+                  return const SizedBox.shrink();
+                }
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTituloSeccion(context, partido.finalizado ? 'Predicciones y resultado' : 'Nuestras predicciones'),
-                const SizedBox(height: 10),
-                _buildCardPredicciones(context),
-                if (partido.muestraChica && !partido.finalizado) ...[
-                  const SizedBox(height: 8),
-                  _buildAvisoMuestraChica(context),
-                ],
-              ],
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTituloSeccion(context, partido.finalizado ? 'Predicciones y resultado' : 'Nuestras predicciones'),
+                    const SizedBox(height: 10),
+                    _buildCardPredicciones(context),
+                    if (partido.muestraChica && !partido.finalizado) ...[
+                      const SizedBox(height: 8),
+                      _buildAvisoMuestraChica(context),
+                    ],
+                  ],
+                );
+              },
             );
           },
         );
@@ -255,8 +306,6 @@ class PartidoDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         child: Column(
           children: [
-            // Fila superior: pill JORNADA (verde) a la izquierda, fecha
-            // anclada a la derecha (no se mueve según el texto).
             Row(
               children: [
                 if (partido.jornada != null)

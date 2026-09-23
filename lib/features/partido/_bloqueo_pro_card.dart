@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/ads/rewarded_ad_manager.dart';
 import '../../core/models/partido.dart';
-import '../../core/services/compras_service.dart';
 import '../../core/services/usuario_state.dart';
+import '../../core/widgets/boton_5_anuncios.dart';
 import '../ajustes/modo_pro_screen.dart';
 
 class BloqueoProCard extends StatefulWidget {
@@ -32,12 +32,6 @@ class _BloqueoProCardState extends State<BloqueoProCard> {
         );
       },
     );
-  }
-
-  Future<void> _pagarPartido() async {
-    setState(() => _procesando = true);
-    await ComprasService.instance.comprarDesbloqueo(widget.partido.id);
-    if (mounted) setState(() => _procesando = false);
   }
 
   @override
@@ -74,6 +68,7 @@ class _BloqueoProCardState extends State<BloqueoProCard> {
               Text('Desbloqueá este partido para ver las predicciones.', style: TextStyle(fontSize: 12.5, color: textoSecundario)),
               const SizedBox(height: 16),
 
+              // Desbloquear ESTE partido viendo 1 anuncio (1 cada 24h)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -84,16 +79,13 @@ class _BloqueoProCardState extends State<BloqueoProCard> {
                 ),
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _procesando ? null : _pagarPartido,
-                  icon: const Icon(Icons.lock_open_rounded, size: 18),
-                  label: const Text('Pagar y desbloquear este partido'),
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.acento, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                ),
-              ),
+
+              // NUEVO: reemplaza al botón "Pagar y desbloquear este partido".
+              // Ve 5 anuncios y desbloquea TODOS los partidos Pro por 24h.
+              const Boton5Anuncios(relleno: true),
               const SizedBox(height: 10),
+
+              // Hacerme Pro (pago, quita anuncios para siempre)
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(

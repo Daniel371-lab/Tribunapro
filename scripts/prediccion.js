@@ -7,14 +7,16 @@ const BASE_LOCAL = 44;
 const BASE_EMPATE = 26;
 const BASE_VISITANTE = 30;
 
-const UMBRAL_EMPATE_TECNICO = 8;
-
 const PROMEDIO_GOLES_LIGA = 1.35;
 const PARTIDOS_PARA_CONFIANZA_PLENA = 5;
 const PARTIDOS_MINIMOS_PROMEDIO_REAL = 6;
+const PARTIDOS_MINIMOS_RESULTADO = 5;
 
 const VENTAJA_LOCAL_LAMBDA = 1.15;
 const H2H_SUAVIZADO_K = 5;
+
+const DEFENSAS_MALAS_UMBRAL = 4.0;
+const ATAQUES_BAJOS_UMBRAL = 3.5;
 // =========================================
 
 function factorial(n) {
@@ -83,6 +85,11 @@ function calcularPrediccion({
   statsVisitante,
   promedioLiga,
 }) {
+  // Partidos jugados por cada equipo: se usan en toda la función (goles,
+  // resultado y quién marca), por eso se declaran una sola vez, arriba de todo.
+  const pjL = statsLocal?.partidosJugados || 0;
+  const pjV = statsVisitante?.partidosJugados || 0;
+
   // ---- 1. Probabilidad 1X2 ----
   const datosH2H = puntosDeH2H(h2h, idLocal);
   const tieneH2H = datosH2H.total > 0;
@@ -117,8 +124,6 @@ function calcularPrediccion({
   let probBTTS = 50;
   let ataqueL = 1.0, defensaV = 1.0;
   let ataqueV = 1.0, defensaL = 1.0;
-  const pjL = statsLocal?.partidosJugados || 0;
-  const pjV = statsVisitante?.partidosJugados || 0;
   const muestraChica = pjL < 5 || pjV < 5;
 
   const partidosMinimos = Math.min(pjL, pjV);
@@ -171,41 +176,41 @@ function calcularPrediccion({
   const predicciones = [];
   const brecha = local - visitante;
 
-  if (brecha >= 25) {
+  const ambosConMinimoPartidos = pjL >= PARTIDOS_MINIMOS_RESULTADO && pjV >= PARTIDOS_MINIMOS_RESULTADO;
+
+  const hayDatosTabla = posicionLocal != null && posicionVisitante != null;
+  const localVentajaPuestos = hayDatosTabla && (posicionVisitante - posicionLocal) >= 5;
+  const visitanteVentajaPuestos = hayDatosTabla && (posicionLocal - posicionVisitante) >= 5;
+
+  if (ambosConMinimoPartidos && brecha >= (localVentajaPuestos ? 28 : 33)) {
     predicciones.push({
       tipo: "resultado",
       texto: `Gana ${nombreLocal}`,
       criterio: { resultados: ["local"] },
     });
-  } else if (-brecha >= 25) {
+  } else if (ambosConMinimoPartidos && -brecha >= (visitanteVentajaPuestos ? 28 : 33)) {
     predicciones.push({
       tipo: "resultado",
       texto: `Gana ${nombreVisitante}`,
       criterio: { resultados: ["visitante"] },
     });
-  } else if (local + empate >= 70) {
+  } else if (local + empate >= (localVentajaPuestos ? 70 : 73)) {
     predicciones.push({
       tipo: "resultado",
       texto: `Doble oportunidad ${nombreLocal} o empate`,
       criterio: { resultados: ["local", "empate"] },
     });
-  } else if (visitante + empate >= 70) {
+  } else if (visitante + empate >= (visitanteVentajaPuestos ? 70 : 73)) {
     predicciones.push({
       tipo: "resultado",
       texto: `Doble oportunidad ${nombreVisitante} o empate`,
       criterio: { resultados: ["visitante", "empate"] },
     });
-  } else if (empate >= 30 && empate > local && empate > visitante) {
-    predicciones.push({
-      tipo: "resultado",
-      texto: "Empate probable",
-      criterio: { resultados: ["empate"] },
-    });
   }
 
   // Categoría: Goles totales
-  const defensasMalas = (defensaL + defensaV) > 4.0;
-  const ataquesBajos = (ataqueL + ataqueV) < 3.5;
+  const defensasMalas = (defensaL + defensaV) > DEFENSAS_MALAS_UMBRAL;
+  const ataquesBajos = (ataqueL + ataqueV) < ATAQUES_BAJOS_UMBRAL;
   const partidoCerrado = defensasMalas && ataquesBajos;
 
   if (probOver25 >= 60 && !partidoCerrado) {
@@ -221,10 +226,9 @@ function calcularPrediccion({
       criterio: { umbral: 2.5, direccion: "menos" },
     });
   } else if (
-    (probBTTS >= 55 && probOver25 >= 50) ||
-    (probOver25 >= 48) ||
+    (probOver25 >= 50) ||
     (ataqueL + ataqueV >= 2.5) ||
-    (probBTTS >= 50)
+    (probBTTS >= 55)
   ) {
     predicciones.push({
       tipo: "goles_totales",
@@ -241,8 +245,17 @@ function calcularPrediccion({
     (p) => p.tipo === "resultado" && p.criterio.resultados.length === 1 && p.criterio.resultados[0] === "visitante"
   );
 
+  // Umbrales de ataque/defensa: más exigentes cuando el equipo tiene pocos
+  // partidos jugados, para no confiar en un dato aislado y ruidoso.
+  const umbralAtaqueL = pjL < 5 ? 1.7 : 1.4;
+  const umbralDefensaL = pjL < 5 ? 1.7 : 1.3;
+  const umbralDefensaLRival = pjL < 5 ? 1.7 : 1.35;
+  const umbralAtaqueV = pjV < 5 ? 1.7 : 1.4;
+  const umbralDefensaV = pjV < 5 ? 1.7 : 1.3;
+  const umbralDefensaVRival = pjV < 5 ? 1.7 : 1.35;
+
   // Categoría: Ambos marcan / marca un equipo puntual
-  if (probBTTS >= 60) {
+  if (probBTTS >= 60 && (defensaL >= umbralDefensaL || defensaV >= umbralDefensaV)) {
     predicciones.push({
       tipo: "ambos_marcan",
       texto: "Ambos equipos van a marcar",
@@ -250,9 +263,9 @@ function calcularPrediccion({
     });
   } else {
     const localMarca =
-      !yaGanaLocal && probBTTS >= 50 && ataqueL >= 1.3 && defensaV >= 1.3;
+      !yaGanaLocal && probBTTS >= 55 && ataqueL >= umbralAtaqueL && defensaV >= umbralDefensaVRival;
     const visitanteMarca =
-      !yaGanaVisitante && probBTTS >= 50 && ataqueV >= 1.3 && defensaL >= 1.3;
+      !yaGanaVisitante && probBTTS >= 55 && ataqueV >= umbralAtaqueV && defensaL >= umbralDefensaLRival;
 
     if (localMarca && visitanteMarca) {
       predicciones.push({
@@ -278,16 +291,11 @@ function calcularPrediccion({
     }
   }
 
-  // Filtro muestra chica
-  const prediccionesFiltradas = muestraChica
-    ? predicciones.filter((p) => p.tipo !== "goles_totales")
-    : predicciones;
-
   return {
     porcentajeLocal: local,
     porcentajeEmpate: empate,
     porcentajeVisitante: visitante,
-    predicciones: prediccionesFiltradas,
+    predicciones,
     muestraChica,
   };
 }
