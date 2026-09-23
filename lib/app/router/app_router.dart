@@ -10,6 +10,7 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
 import '../../features/competencias/competencia_detail_screen.dart';
 import '../../features/favoritos/favoritos_screen.dart';
+import '../../features/trivia/trivia_screen.dart';
 import '../../features/historial/historial_screen.dart';
 import '../../features/ajustes/ajustes_screen.dart';
 import '../../features/partido/partido_detail_screen.dart';
@@ -107,6 +108,11 @@ class AppRouter {
           ),
           StatefulShellBranch(
             routes: [
+              GoRoute(path: '/trivia', builder: (context, state) => const TriviaScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
               GoRoute(path: '/historial', builder: (context, state) => const HistorialScreen()),
             ],
           ),
@@ -194,6 +200,7 @@ class _AppShellState extends State<_AppShell> {
                 NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
                 NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Competencias'),
                 NavigationDestination(icon: Icon(Icons.star_outline), label: 'Favoritos'),
+                NavigationDestination(icon: Icon(Icons.psychology_outlined), label: 'Trivia'),
                 NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
               ],
             ),
