@@ -20,7 +20,7 @@ class _FormacionInfo {
   final int defensa;
   final String descripcion;
   final IconData icono;
-  final List<int> lineas; // jugadores por línea (defensa → ataque)
+  final List<int> lineas;
   const _FormacionInfo(this.nombre, this.ataque, this.defensa, this.descripcion, this.icono, this.lineas);
 }
 
@@ -35,7 +35,7 @@ class _EstiloInfo {
 }
 
 enum _ResultadoTurno { golMio, golRival, nada }
-enum _Fase { bienvenida, eligiendoEquipo, jugandoTurno, revelandoTurno, penales, resultado }
+enum _Fase { bienvenida, eligiendoEquipo, corriendoReloj, jugandoTurno, revelandoTurno, penales, resultado }
 enum _ZonaPenal { izquierda, centro, derecha }
 
 class _DetallePenal {
@@ -99,27 +99,24 @@ class MiniMundialScreen extends StatefulWidget {
 class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProviderStateMixin {
   final _random = Random();
 
-  // ---- Flujo general ----
   _Fase _fase = _Fase.bienvenida;
   _Seleccion? _miEquipo;
   _Seleccion? _rivalEquipo;
   int _ronda = 1;
   final List<bool> _historialRondas = [];
 
-  // ---- Partido ----
   int _golesMi = 0;
   int _golesRival = 0;
   List<int> _minutosClave = [];
   int _indiceTurno = 0;
+  int _minutoMostrado = 0;
 
-  // ---- Turno actual ----
   _FormacionInfo? _miFormacionTurno;
   _EstiloInfo? _miEstiloTurno;
   _FormacionInfo? _rivalFormacionTurno;
   _EstiloInfo? _rivalEstiloTurno;
   _ResultadoTurno? _resultadoTurnoActual;
 
-  // ---- Penales ----
   int _penalesMi = 0;
   int _penalesRival = 0;
   int _tirosMi = 0;
@@ -128,22 +125,17 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   bool _esMuerteSubita = false;
   final List<_DetallePenal> _detallesPenales = [];
 
-  // ---- Timers y animaciones ----
   Timer? _timerAnimacion;
   late final AnimationController _flipController;
   late final AnimationController _dotsRivalController;
+  late final AnimationController _relojController;
 
   @override
   void initState() {
     super.initState();
-    _flipController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _dotsRivalController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
+    _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _dotsRivalController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _relojController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
   }
 
   @override
@@ -151,11 +143,12 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _timerAnimacion?.cancel();
     _flipController.dispose();
     _dotsRivalController.dispose();
+    _relojController.dispose();
     super.dispose();
   }
 
   // ---------------------------------------------------------------------------
-  // GENERADOR DE MINUTOS
+  // MINUTOS
   // ---------------------------------------------------------------------------
 
   List<int> _generarMinutos() {
@@ -165,7 +158,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ---------------------------------------------------------------------------
-  // FLUJO DE FASES
+  // FLUJO
   // ---------------------------------------------------------------------------
 
   void _empezar() {
@@ -192,6 +185,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _golesRival = 0;
     _minutosClave = _generarMinutos();
     _indiceTurno = 0;
+    _minutoMostrado = 0;
     _miFormacionTurno = null;
     _miEstiloTurno = null;
     _rivalFormacionTurno = null;
@@ -199,7 +193,38 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _resultadoTurnoActual = null;
     _flipController.reset();
     _dotsRivalController.reset();
-    _fase = _Fase.jugandoTurno;
+    _iniciarRelojTurno();
+  }
+
+  void _iniciarRelojTurno() {
+    final minutoAnterior = _indiceTurno == 0 ? 0 : _minutosClave[_indiceTurno - 1];
+    final minutoActual = _minutosClave[_indiceTurno];
+
+    _minutoMostrado = minutoAnterior;
+    setState(() => _fase = _Fase.corriendoReloj);
+
+    _relojController.reset();
+    _relojController.duration = Duration(
+      milliseconds: 900 + ((minutoActual - minutoAnterior) * 22).clamp(600, 2000),
+    );
+
+    // Listener para ir actualizando el minuto mostrado.
+    void listener() {
+      final valor = _relojController.value;
+      final minuto = (minutoAnterior + (minutoActual - minutoAnterior) * valor).round();
+      if (mounted && minuto != _minutoMostrado) {
+        setState(() => _minutoMostrado = minuto);
+      }
+    }
+
+    _relojController.addListener(listener);
+
+    _relojController.forward().then((_) {
+      _relojController.removeListener(listener);
+      if (!mounted) return;
+      HapticFeedback.selectionClick();
+      setState(() => _fase = _Fase.jugandoTurno);
+    });
   }
 
   void _confirmarTurno() {
@@ -217,13 +242,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       _fase = _Fase.revelandoTurno;
     });
 
-    // Animación: primero aparecen los puntos del rival en la pizarra,
-    // después se voltean las cartas.
     _dotsRivalController.forward(from: 0).then((_) {
       if (!mounted) return;
       _flipController.forward(from: 0).then((_) {
         if (!mounted) return;
-        // Cuando terminan las 2 animaciones, actualizamos marcador y vibramos.
         setState(() {
           if (resultado == _ResultadoTurno.golMio) {
             _golesMi++;
@@ -233,8 +255,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             HapticFeedback.heavyImpact();
           }
         });
-
-        // Esperamos un momento para que se vea el resultado y avanzamos.
         _timerAnimacion = Timer(const Duration(milliseconds: 1400), () {
           if (!mounted) return;
           _avanzarTurno();
@@ -255,15 +275,14 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       _rivalFormacionTurno = null;
       _rivalEstiloTurno = null;
       _resultadoTurnoActual = null;
-      _fase = _Fase.jugandoTurno;
       _flipController.reset();
       _dotsRivalController.reset();
     });
+    _iniciarRelojTurno();
   }
 
   void _terminarPartido() {
-    final empate = _golesMi == _golesRival;
-    if (empate) {
+    if (_golesMi == _golesRival) {
       setState(() {
         _penalesMi = 0;
         _penalesRival = 0;
@@ -311,7 +330,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ---------------------------------------------------------------------------
-  // LÓGICA DEL TURNO
+  // TURNO
   // ---------------------------------------------------------------------------
 
   _ResultadoTurno _resolverTurno(
@@ -335,13 +354,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       }
       return _ResultadoTurno.nada;
     }
-
-    if (miAtaqueNeto > rivalAtaqueNeto && miAtaqueNeto >= 2) {
-      return _ResultadoTurno.golMio;
-    }
-    if (rivalAtaqueNeto > miAtaqueNeto && rivalAtaqueNeto >= 2) {
-      return _ResultadoTurno.golRival;
-    }
+    if (miAtaqueNeto > rivalAtaqueNeto && miAtaqueNeto >= 2) return _ResultadoTurno.golMio;
+    if (rivalAtaqueNeto > miAtaqueNeto && rivalAtaqueNeto >= 2) return _ResultadoTurno.golRival;
     return _ResultadoTurno.nada;
   }
 
@@ -351,7 +365,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
   void _resolverPenal(_ZonaPenal miEleccion) {
     HapticFeedback.selectionClick();
-
     if (_esTurnoMio) {
       final arqueroRival = _ZonaPenal.values[_random.nextInt(3)];
       final esGol = arqueroRival != miEleccion;
@@ -375,9 +388,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         HapticFeedback.heavyImpact();
       }
     }
-
     setState(() {});
-
     _timerAnimacion = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       _avanzarPenal();
@@ -392,7 +403,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       }
       setState(() => _esMuerteSubita = true);
     }
-
     if (_esMuerteSubita) {
       if (_tirosMi == _tirosRival && _penalesMi != _penalesRival) {
         _terminarPenales();
@@ -401,7 +411,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       setState(() => _esTurnoMio = _tirosMi == _tirosRival);
       return;
     }
-
     setState(() => _esTurnoMio = !_esTurnoMio);
   }
 
@@ -421,6 +430,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         return _vistaBienvenida();
       case _Fase.eligiendoEquipo:
         return _vistaElegirEquipo();
+      case _Fase.corriendoReloj:
       case _Fase.jugandoTurno:
       case _Fase.revelandoTurno:
         return _vistaPartidoEnVivo();
@@ -432,7 +442,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // VISTA: BIENVENIDA
+  // BIENVENIDA
   // ===========================================================================
 
   Widget _vistaBienvenida() {
@@ -459,20 +469,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                   colors: [Color(0xFFE8B923), Color(0xFFB58A0F)],
                 ),
                 boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE8B923).withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
+                  BoxShadow(color: const Color(0xFFE8B923).withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 8)),
                 ],
               ),
               child: const Icon(Icons.emoji_events_rounded, size: 52, color: Colors.white),
             ),
             const SizedBox(height: 24),
-            Text(
-              'Mini Mundial',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: -0.5),
-            ),
+            Text('Mini Mundial', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: -0.5)),
             const SizedBox(height: 10),
             Text(
               'Elige tu selección y gana 4 rondas para ser campeón',
@@ -535,7 +538,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // VISTA: ELEGIR EQUIPO
+  // ELEGIR EQUIPO
   // ===========================================================================
 
   Widget _vistaElegirEquipo() {
@@ -554,10 +557,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8B923).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFE8B923).withValues(alpha: 0.15), shape: BoxShape.circle),
               child: const Icon(Icons.emoji_events_rounded, size: 20, color: Color(0xFFE8B923)),
             ),
             const SizedBox(width: 12),
@@ -565,10 +565,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Elige tu selección',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textoPrincipal, letterSpacing: -0.2)),
-                  Text('Enfrentarás rivales al azar hasta la final',
-                      style: TextStyle(fontSize: 12, color: textoSecundario)),
+                  Text('Elige tu selección', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textoPrincipal, letterSpacing: -0.2)),
+                  Text('Enfrentarás rivales al azar hasta la final', style: TextStyle(fontSize: 12, color: textoSecundario)),
                 ],
               ),
             ),
@@ -620,26 +618,28 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // VISTA: PARTIDO EN VIVO
+  // PARTIDO EN VIVO
   // ===========================================================================
 
   Widget _vistaPartidoEnVivo() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
     final revelando = _fase == _Fase.revelandoTurno;
+    final corriendo = _fase == _Fase.corriendoReloj;
 
     return Column(
       children: [
         _buildHeaderPartido(),
-        // Pizarra con la cancha y las formaciones
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: _buildPizarra(revelando),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+          child: _buildPizarra(revelando, corriendo),
         ),
         Expanded(
           child: Container(
             color: fondo,
-            child: revelando ? _buildPanelRevelacion() : _buildPanelTurno(),
+            child: revelando
+                ? _buildPanelRevelacion()
+                : (corriendo ? _buildPanelReloj() : _buildPanelTurno()),
           ),
         ),
       ],
@@ -653,7 +653,9 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
-    final minutoActual = _minutosClave.length > _indiceTurno ? _minutosClave[_indiceTurno] : 90;
+    final minutoActual = _fase == _Fase.corriendoReloj
+        ? _minutoMostrado
+        : (_minutosClave.length > _indiceTurno ? _minutosClave[_indiceTurno] : 90);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -716,9 +718,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             children: [
               Icon(Icons.timer_outlined, size: 14, color: textoSecundario),
               const SizedBox(width: 6),
-              Text(
-                minutoActual == 90 ? 'FIN DEL PARTIDO' : 'Minuto $minutoActual · Ronda $_ronda de 4',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoSecundario, letterSpacing: 0.3),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(
+                  minutoActual == 90 ? 'FIN DEL PARTIDO' : "Minuto $minutoActual' · Ronda $_ronda de 4",
+                  key: ValueKey(minutoActual),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textoSecundario, letterSpacing: 0.3),
+                ),
               ),
             ],
           ),
@@ -728,72 +734,63 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // PIZARRA CON LA CANCHA
+  // PIZARRA (cancha horizontal)
   // ===========================================================================
 
-  Widget _buildPizarra(bool revelando) {
+  Widget _buildPizarra(bool revelando, bool corriendo) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
-    // La formación del rival en la pizarra depende de si ya se reveló.
     final rivalFormEnPizarra = revelando ? _rivalFormacionTurno : null;
 
     return Container(
-      height: 190,
+      height: 130,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borde, width: 0.8),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Fondo verde con gradiente
             Positioned.fill(
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                     colors: [Color(0xFF1B6B40), Color(0xFF0E4A28)],
                   ),
                 ),
               ),
             ),
-            // Líneas de la cancha
-            Positioned.fill(
-              child: CustomPaint(painter: _CanchaPainter()),
-            ),
-            // Formación del rival (arriba)
+            Positioned.fill(child: CustomPaint(painter: _CanchaHorizontalPainter())),
+            // Rival (derecha)
             if (rivalFormEnPizarra != null)
               ..._construirDotsFormacion(
                 rivalFormEnPizarra,
                 esRival: true,
                 controller: _dotsRivalController,
               ),
-            // Mi formación (abajo)
+            // Mi equipo (izquierda)
             if (_miFormacionTurno != null)
               ..._construirDotsFormacion(
                 _miFormacionTurno!,
                 esRival: false,
                 controller: null,
               ),
-            // Nombre del equipo en cada mitad
+            // Etiquetas
             Positioned(
-              top: 6,
-              left: 8,
+              top: 4,
+              right: 6,
               child: _buildPillEquipo(_rivalEquipo!.codigoBandera, _rivalEquipo!.nombre, Colors.red.shade900),
             ),
             Positioned(
-              bottom: 6,
-              left: 8,
+              bottom: 4,
+              left: 6,
               child: _buildPillEquipo(_miEquipo!.codigoBandera, _miEquipo!.nombre, AppColors.acento),
             ),
           ],
@@ -804,7 +801,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
   Widget _buildPillEquipo(String codigoBandera, String nombre, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(20),
@@ -812,19 +809,17 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _banderaCircular(codigoBandera, size: 14),
-          const SizedBox(width: 5),
+          _banderaCircular(codigoBandera, size: 12),
+          const SizedBox(width: 4),
           Text(
             nombre,
-            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3),
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3),
           ),
         ],
       ),
     );
   }
 
-  // Genera los dots de la formación. Si esRival, se ubican en la mitad superior.
-  // Si es la mía, en la mitad inferior.
   List<Widget> _construirDotsFormacion(
     _FormacionInfo formacion, {
     required bool esRival,
@@ -836,59 +831,44 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
     for (int i = 0; i < totalLineas; i++) {
       final cantidad = lineas[i];
-      // i=0 es defensa, i=último es ataque.
-      // Para MI equipo (abajo): la defensa está más abajo (y alto),
-      // el ataque más arriba (y bajo).
-      // Para el RIVAL (arriba): espejado.
       final double fraccionLinea = i / (totalLineas - 1 == 0 ? 1 : totalLineas - 1);
 
-      // Coordenada vertical (0 = arriba del todo, 1 = abajo del todo).
-      // Mi equipo: ataque arriba del 0.5, defensa cerca del 0.85.
-      // Rival: ataque cerca del 0.5, defensa cerca del 0.15.
-      final double y;
+      // Coordenada horizontal: mi equipo defensa a la izquierda, ataque al centro.
+      // Rival: defensa a la derecha, ataque al centro.
+      final double x;
       if (esRival) {
-        // Cuanto más alta la línea (ataque), más cerca del centro.
-        y = 0.45 - fraccionLinea * 0.35;
+        x = 0.88 - fraccionLinea * 0.32;
       } else {
-        // Cuanto más alta la línea (ataque), más cerca del centro.
-        y = 0.55 + (1 - fraccionLinea) * 0.35;
+        x = 0.12 + fraccionLinea * 0.32;
       }
 
       for (int j = 0; j < cantidad; j++) {
-        final double x = (j + 1) / (cantidad + 1);
+        final double y = (j + 1) / (cantidad + 1);
 
         final dot = Container(
-          width: 12,
-          height: 12,
+          width: 10,
+          height: 10,
           decoration: BoxDecoration(
             color: esRival ? Colors.red.shade200 : Colors.white,
             shape: BoxShape.circle,
             border: Border.all(
               color: esRival ? Colors.red.shade900 : AppColors.acento,
-              width: 1.5,
+              width: 1.3,
             ),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 2, offset: const Offset(0, 1)),
             ],
           ),
         );
 
         Widget dotFinal = dot;
         if (controller != null) {
-          // Animación de aparición para los dots del rival.
           dotFinal = AnimatedBuilder(
             animation: controller,
             builder: (context, child) {
               return Opacity(
                 opacity: controller.value,
-                child: Transform.scale(
-                  scale: 0.6 + controller.value * 0.4,
-                  child: child,
-                ),
+                child: Transform.scale(scale: 0.6 + controller.value * 0.4, child: child),
               );
             },
             child: dot,
@@ -907,7 +887,49 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // PANEL DE ELECCIÓN DEL TURNO
+  // PANEL: RELOJ CORRIENDO
+  // ===========================================================================
+
+  Widget _buildPanelReloj() {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+    final minutoObjetivo = _minutosClave[_indiceTurno];
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
+          const SizedBox(height: 12),
+          Text(
+            'El partido sigue...',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Se acerca un momento clave',
+            style: TextStyle(fontSize: 12.5, color: textoSecundario),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.acento.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Próximo momento: minuto $minutoObjetivo',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.acento, letterSpacing: 0.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // PANEL: ELEGIR TURNO
   // ===========================================================================
 
   Widget _buildPanelTurno() {
@@ -919,7 +941,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
               Container(
@@ -929,7 +951,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'MINUTO $minutoActual',
+                  "MINUTO $minutoActual'",
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.acento, letterSpacing: 0.6),
                 ),
               ),
@@ -945,15 +967,15 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Formación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 100,
+                  height: 96,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -976,11 +998,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                     },
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 100,
+                  height: 96,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -1008,14 +1030,14 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: SizedBox(
             width: double.infinity,
-            height: 54,
+            height: 50,
             child: FilledButton.icon(
               onPressed: (_miFormacionTurno != null && _miEstiloTurno != null) ? _confirmarTurno : null,
-              icon: const Icon(Icons.sports_soccer_rounded, size: 22),
-              label: const Text('Confirmar jugada', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+              icon: const Icon(Icons.sports_soccer_rounded, size: 20),
+              label: const Text('Confirmar jugada', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.acento,
                 foregroundColor: Colors.white,
@@ -1050,24 +1072,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 110,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        width: 106,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: seleccionada ? color.withValues(alpha: 0.10) : superficie,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: seleccionada ? color : borde,
-            width: seleccionada ? 1.8 : 0.8,
-          ),
-          boxShadow: seleccionada
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
+          border: Border.all(color: seleccionada ? color : borde, width: seleccionada ? 1.8 : 0.8),
+          boxShadow: seleccionada ? [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 3))] : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1076,28 +1087,28 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             Row(
               children: [
                 Container(
-                  width: 26,
-                  height: 26,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: seleccionada ? color : color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icono, size: 14, color: seleccionada ? Colors.white : color),
+                  child: Icon(icono, size: 13, color: seleccionada ? Colors.white : color),
                 ),
                 const Spacer(),
-                if (seleccionada) Icon(Icons.check_circle_rounded, size: 16, color: color),
+                if (seleccionada) Icon(Icons.check_circle_rounded, size: 15, color: color),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               titulo,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               subtitulo,
-              style: TextStyle(fontSize: 9.5, color: textoSecundario),
+              style: TextStyle(fontSize: 9, color: textoSecundario),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1108,7 +1119,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // PANEL DE REVELACIÓN (con cartas volteadas)
+  // PANEL: REVELACIÓN
   // ===========================================================================
 
   Widget _buildPanelRevelacion() {
@@ -1138,81 +1149,70 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     };
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
         children: [
-          // Cartas enfrentadas (con flip)
           Row(
             children: [
-              // Mi carta de formación + estilo
               Expanded(child: _buildMiJugadaCarta()),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  'VS',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textoSecundario, letterSpacing: 1),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text('VS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: textoSecundario, letterSpacing: 1)),
               ),
-              // Cartas del rival (flip)
               Expanded(child: _buildRivalJugadaCarta()),
             ],
           ),
-          const SizedBox(height: 14),
-
-          // Resultado
-          AnimatedBuilder(
-            animation: _flipController,
-            builder: (context, _) {
-              // Mostramos el resultado solo cuando el flip del rival terminó.
-              final mostrarResultado = _flipController.value >= 1.0;
-              return AnimatedOpacity(
-                opacity: mostrarResultado ? 1 : 0,
-                duration: const Duration(milliseconds: 300),
-                child: AnimatedScale(
-                  scale: mostrarResultado ? 1.0 : 0.8,
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeOutBack,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: colorResultado.withValues(alpha: esGol ? 0.14 : 0.06),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: colorResultado.withValues(alpha: 0.4), width: 1.5),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(iconoResultado, size: 40, color: colorResultado),
-                        const SizedBox(height: 8),
-                        Text(
-                          textResultado,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: colorResultado,
-                            letterSpacing: 0.5,
-                          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _flipController,
+                builder: (context, _) {
+                  final mostrarResultado = _flipController.value >= 1.0;
+                  return AnimatedOpacity(
+                    opacity: mostrarResultado ? 1 : 0,
+                    duration: const Duration(milliseconds: 300),
+                    child: AnimatedScale(
+                      scale: mostrarResultado ? 1.0 : 0.8,
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutBack,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: colorResultado.withValues(alpha: esGol ? 0.14 : 0.06),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: colorResultado.withValues(alpha: 0.4), width: 1.5),
                         ),
-                        if (esGol) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '$_golesMi - $_golesRival',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
-                          ),
-                        ],
-                      ],
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(iconoResultado, size: 32, color: colorResultado),
+                            const SizedBox(height: 6),
+                            Text(
+                              textResultado,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: colorResultado, letterSpacing: 0.5),
+                            ),
+                            if (esGol) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '$_golesMi - $_golesRival',
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Mi jugada (carta revelada, sin flip).
   Widget _buildMiJugadaCarta() {
     return Column(
       children: [
@@ -1222,7 +1222,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           titulo: _miFormacionTurno?.nombre ?? '',
           subtitulo: 'Formación',
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _buildCartaVolteada(
           color: _miEstiloTurno?.color ?? AppColors.acento,
           icono: _miEstiloTurno?.icono ?? Icons.bolt_rounded,
@@ -1233,14 +1233,12 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     );
   }
 
-  // Cartas del rival con animación de flip. Empiezan boca abajo.
   Widget _buildRivalJugadaCarta() {
     return AnimatedBuilder(
       animation: _flipController,
       builder: (context, _) {
         final angle = _flipController.value * pi;
         final mostrarFrente = angle > pi / 2;
-
         return Column(
           children: [
             _buildCartaConFlip(
@@ -1251,7 +1249,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               titulo: _rivalFormacionTurno?.nombre ?? '',
               subtitulo: 'Formación',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _buildCartaConFlip(
               angulo: angle,
               mostrarFrente: mostrarFrente,
@@ -1275,13 +1273,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     required String subtitulo,
   }) {
     return Transform(
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.001)
-        ..rotateY(angulo),
+      transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angulo),
       alignment: Alignment.center,
       child: mostrarFrente
           ? Transform(
-              // Contra-rotación para que el frente no quede espejado.
               transform: Matrix4.identity()..rotateY(pi),
               alignment: Alignment.center,
               child: _buildCartaVolteada(color: color, icono: icono, titulo: titulo, subtitulo: subtitulo),
@@ -1290,7 +1285,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     );
   }
 
-  // Carta revelada (frente).
   Widget _buildCartaVolteada({
     required Color color,
     required IconData icono,
@@ -1304,65 +1298,49 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.3),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 3))],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Icon(icono, size: 14, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subtitulo,
+                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: textoSecundario),
                 ),
-                child: Icon(icono, size: 16, color: Colors.white),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      subtitulo,
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: textoSecundario),
-                    ),
-                    Text(
-                      titulo,
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: textoPrincipal),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                Text(
+                  titulo,
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: textoPrincipal),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Carta boca abajo (dorso).
   Widget _buildCartaDorso() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1371,51 +1349,30 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               ? [const Color(0xFF3A1F24), const Color(0xFF1F1114)]
               : [const Color(0xFF8B1A29), const Color(0xFF5A1018)],
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE63946).withValues(alpha: 0.5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE63946).withValues(alpha: 0.20),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE63946).withValues(alpha: 0.5), width: 1.3),
+        boxShadow: [BoxShadow(color: const Color(0xFFE63946).withValues(alpha: 0.20), blurRadius: 8, offset: const Offset(0, 3))],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: const Icon(Icons.help_outline_rounded, size: 14, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ELEGIDA',
+                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: Colors.white.withValues(alpha: 0.7)),
                 ),
-                child: const Icon(Icons.help_outline_rounded, size: 16, color: Colors.white),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ELEGIDA',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    const Text(
-                      '???',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                const Text('???', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white)),
+              ],
+            ),
           ),
         ],
       ),
@@ -1423,7 +1380,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // VISTA: PENALES
+  // PENALES
   // ===========================================================================
 
   Widget _vistaPenales() {
@@ -1650,11 +1607,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               shape: BoxShape.circle,
               border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
             ),
-            child: Icon(
-              ultimoDetalle.fueGol ? Icons.sports_soccer_rounded : Icons.back_hand_rounded,
-              size: 44,
-              color: color,
-            ),
+            child: Icon(ultimoDetalle.fueGol ? Icons.sports_soccer_rounded : Icons.back_hand_rounded, size: 44, color: color),
           ),
           const SizedBox(height: 16),
           Text(texto, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
@@ -1664,7 +1617,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // VISTA: RESULTADO
+  // RESULTADO
   // ===========================================================================
 
   Widget _vistaResultado() {
@@ -1827,7 +1780,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // BANDERA CIRCULAR
+  // BANDERA
   // ===========================================================================
 
   Widget _banderaCircular(String codigo, {required double size}) {
@@ -1861,10 +1814,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 }
 
 // ============================================================================
-// PAINTER DE LA CANCHA
+// PAINTER: CANCHA HORIZONTAL
 // ============================================================================
 
-class _CanchaPainter extends CustomPainter {
+class _CanchaHorizontalPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -1872,32 +1825,49 @@ class _CanchaPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
+    final margen = 6.0;
+
     // Borde
-    final margen = 8.0;
     final rect = Rect.fromLTWH(margen, margen, size.width - margen * 2, size.height - margen * 2);
     canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
 
-    // Línea del medio
-    canvas.drawLine(Offset(margen, size.height / 2), Offset(size.width - margen, size.height / 2), paint);
+    // Línea del medio (VERTICAL, no horizontal)
+    canvas.drawLine(
+      Offset(size.width / 2, margen),
+      Offset(size.width / 2, size.height - margen),
+      paint,
+    );
 
     // Círculo central
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 22, paint);
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.height * 0.26, paint);
 
-    // Área grande arriba
-    final areaAncho = size.width * 0.45;
-    final areaAlto = size.height * 0.13;
-    canvas.drawRect(Rect.fromLTWH((size.width - areaAncho) / 2, margen, areaAncho, areaAlto), paint);
+    // Área grande izquierda
+    final areaAncho = size.width * 0.12;
+    final areaAlto = size.height * 0.55;
+    canvas.drawRect(
+      Rect.fromLTWH(margen, (size.height - areaAlto) / 2, areaAncho, areaAlto),
+      paint,
+    );
 
-    // Área grande abajo
-    canvas.drawRect(Rect.fromLTWH((size.width - areaAncho) / 2, size.height - margen - areaAlto, areaAncho, areaAlto), paint);
+    // Área grande derecha
+    canvas.drawRect(
+      Rect.fromLTWH(size.width - margen - areaAncho, (size.height - areaAlto) / 2, areaAncho, areaAlto),
+      paint,
+    );
 
-    // Área chica arriba
-    final areaChicaAncho = size.width * 0.24;
-    final areaChicaAlto = size.height * 0.06;
-    canvas.drawRect(Rect.fromLTWH((size.width - areaChicaAncho) / 2, margen, areaChicaAncho, areaChicaAlto), paint);
+    // Área chica izquierda
+    final areaChicaAncho = size.width * 0.05;
+    final areaChicaAlto = size.height * 0.28;
+    canvas.drawRect(
+      Rect.fromLTWH(margen, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto),
+      paint,
+    );
 
-    // Área chica abajo
-    canvas.drawRect(Rect.fromLTWH((size.width - areaChicaAncho) / 2, size.height - margen - areaChicaAlto, areaChicaAncho, areaChicaAlto), paint);
+    // Área chica derecha
+    canvas.drawRect(
+      Rect.fromLTWH(size.width - margen - areaChicaAncho, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto),
+      paint,
+    );
   }
 
   @override
