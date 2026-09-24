@@ -96,10 +96,10 @@ class _TriviaScreenState extends State<TriviaScreen> with SingleTickerProviderSt
   }
 
   String _mensajeSegunAciertos(int aciertos) {
-    if (aciertos <= 3) return 'Falta mejorar';
-    if (aciertos <= 5) return 'Punto medio';
-    if (aciertos <= 8) return 'Buen nivel';
-    return 'Máximo conocimiento';
+    if (aciertos <= 3) return 'A seguir practicando';
+    if (aciertos <= 5) return 'Vas por buen camino';
+    if (aciertos <= 8) return '¡Buen nivel!';
+    return '¡Conocimiento máximo!';
   }
 
   @override
@@ -107,7 +107,6 @@ class _TriviaScreenState extends State<TriviaScreen> with SingleTickerProviderSt
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
-    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
     return Scaffold(
       backgroundColor: fondo,
@@ -127,8 +126,10 @@ class _TriviaScreenState extends State<TriviaScreen> with SingleTickerProviderSt
             TabBar(
               controller: _tabController,
               labelColor: AppColors.acento,
-              unselectedLabelColor: textoSecundario,
+              unselectedLabelColor: esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro,
               indicatorColor: AppColors.acento,
+              indicatorWeight: 2.5,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               tabs: const [
                 Tab(text: 'Reto diario'),
                 Tab(text: 'Mini Mundial'),
@@ -165,188 +166,331 @@ class _TriviaScreenState extends State<TriviaScreen> with SingleTickerProviderSt
         final estado = snapshot.data!;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
           physics: const BouncingScrollPhysics(),
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.acento.withOpacity(0.18),
-                    AppColors.pro.withOpacity(0.10),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: borde, width: 0.8),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 72,
-                    height: 72,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 72,
-                          height: 72,
-                          child: CircularProgressIndicator(
-                            value: estado.yaJugoHoy ? estado.aciertos / 10 : 0,
-                            strokeWidth: 6,
-                            backgroundColor: borde,
-                            valueColor: AlwaysStoppedAnimation(_colorSegunAciertos(estado.aciertos)),
-                          ),
-                        ),
-                        Text(
-                          estado.yaJugoHoy ? '${estado.aciertos}/10' : '—',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textoPrincipal),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          estado.yaJugoHoy ? 'Ya completaste tu reto de hoy' : 'Poné a prueba tu conocimiento hoy',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          estado.yaJugoHoy
-                              ? _mensajeSegunAciertos(estado.aciertos)
-                              : '10 preguntas de fútbol te esperan',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: estado.yaJugoHoy ? FontWeight.w600 : FontWeight.normal,
-                            color: estado.yaJugoHoy ? _colorSegunAciertos(estado.aciertos) : textoSecundario,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (!estado.yaJugoHoy)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _jugar,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Jugar'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.acento,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: superficie,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borde, width: 0.8),
-                ),
-                child: Center(
-                  child: Text(
-                    'Volvé mañana para un nuevo reto',
-                    style: TextStyle(fontSize: 12.5, color: textoSecundario),
-                  ),
-                ),
-              ),
+            _buildHeaderCard(estado, textoPrincipal, textoSecundario, borde),
+            const SizedBox(height: 18),
+            if (!estado.yaJugoHoy) _buildBotonJugar() else _buildEstadoCompletado(textoSecundario, borde, superficie),
             const SizedBox(height: 28),
             Text(
               'INSIGNIAS',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: textoSecundario),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             if (estado.esInvitado)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-                decoration: BoxDecoration(
-                  color: superficie,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borde, width: 0.8),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.lock_outline_rounded, color: textoSecundario, size: 28),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Creá una cuenta para desbloquear insignias',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textoPrincipal),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tu progreso de invitado no se guarda de forma permanente',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: textoSecundario),
-                    ),
-                  ],
-                ),
-              )
+              _buildBloqueoInvitado(textoPrincipal, textoSecundario, borde, superficie)
             else
-              SizedBox(
-                height: 96,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: _definicionInsignias.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final insignia = _definicionInsignias[index];
-                    final desbloqueada = estado.insignias.contains(insignia.clave);
-
-                    return Container(
-                      width: 88,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: superficie,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: borde, width: 0.8),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            insignia.icono,
-                            size: 22,
-                            color: desbloqueada ? insignia.color : textoSecundario.withOpacity(0.4),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            insignia.titulo,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: desbloqueada ? textoPrincipal : textoSecundario.withOpacity(0.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
+              _buildCarruselInsignias(estado, textoPrincipal, textoSecundario, borde, superficie),
           ],
         );
       },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // HEADER
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeaderCard(_EstadoTrivia estado, Color textoPrincipal, Color textoSecundario, Color borde) {
+    final bool completado = estado.yaJugoHoy;
+    final color = completado ? _colorSegunAciertos(estado.aciertos) : AppColors.acento;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.20),
+            color.withValues(alpha: 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.30), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildCirculoHeader(estado, color, borde),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  completado ? 'Reto completado' : 'Reto diario',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: textoPrincipal,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  completado ? _mensajeSegunAciertos(estado.aciertos) : '10 preguntas de fútbol',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: completado ? FontWeight.w700 : FontWeight.w500,
+                    color: completado ? color : textoSecundario,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCirculoHeader(_EstadoTrivia estado, Color color, Color borde) {
+    const double size = 82;
+    const double stroke = 7;
+
+    // No jugó: círculo sólido con ícono.
+    if (!estado.yaJugoHoy) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.acento,
+              AppColors.acento.withValues(alpha: 0.65),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.acento.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.sports_esports_rounded, size: 38, color: Colors.white),
+      );
+    }
+
+    // Ya jugó: anillo con progreso + número adentro.
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Anillo de fondo
+          SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              value: 1.0,
+              strokeWidth: stroke,
+              valueColor: AlwaysStoppedAnimation(borde),
+              strokeCap: StrokeCap.round,
+            ),
+          ),
+          // Anillo de progreso
+          SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              value: estado.aciertos / 10,
+              strokeWidth: stroke,
+              valueColor: AlwaysStoppedAnimation(color),
+              strokeCap: StrokeCap.round,
+            ),
+          ),
+          // Número central
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${estado.aciertos}',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color, height: 1),
+              ),
+              Text(
+                'de 10',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color.withValues(alpha: 0.75), height: 1.2),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotonJugar() {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: FilledButton.icon(
+        onPressed: _jugar,
+        icon: const Icon(Icons.play_arrow_rounded, size: 24),
+        label: const Text('Jugar reto de hoy', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.acento,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 6,
+          shadowColor: AppColors.acento.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEstadoCompletado(Color textoSecundario, Color borde, Color superficie) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borde, width: 0.8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 18, color: AppColors.acento),
+          const SizedBox(width: 8),
+          Text(
+            'Volvé mañana para un nuevo reto',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textoSecundario),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // INSIGNIAS
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBloqueoInvitado(Color textoPrincipal, Color textoSecundario, Color borde, Color superficie) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borde, width: 0.8),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: textoSecundario.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.lock_outline_rounded, color: textoSecundario, size: 26),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Crea una cuenta para desbloquear insignias',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textoPrincipal),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tu progreso de invitado no se guarda de forma permanente',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: textoSecundario),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCarruselInsignias(_EstadoTrivia estado, Color textoPrincipal, Color textoSecundario, Color borde, Color superficie) {
+    return SizedBox(
+      height: 120,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _definicionInsignias.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final insignia = _definicionInsignias[index];
+          final desbloqueada = estado.insignias.contains(insignia.clave);
+          return _buildInsignia(insignia, desbloqueada, textoPrincipal, textoSecundario, borde, superficie);
+        },
+      ),
+    );
+  }
+
+  Widget _buildInsignia(
+    _InsigniaInfo insignia,
+    bool desbloqueada,
+    Color textoPrincipal,
+    Color textoSecundario,
+    Color borde,
+    Color superficie,
+  ) {
+    final Color colorIcono = desbloqueada ? insignia.color : textoSecundario.withValues(alpha: 0.35);
+    final Color colorFondo = desbloqueada ? insignia.color.withValues(alpha: 0.14) : textoSecundario.withValues(alpha: 0.06);
+    final Color colorBorde = desbloqueada ? insignia.color.withValues(alpha: 0.40) : borde;
+
+    return Container(
+      width: 92,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorBorde, width: desbloqueada ? 1.4 : 0.8),
+        boxShadow: desbloqueada
+            ? [
+                BoxShadow(
+                  color: insignia.color.withValues(alpha: 0.14),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorFondo,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              desbloqueada ? insignia.icono : Icons.lock_rounded,
+              size: 24,
+              color: colorIcono,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            insignia.titulo,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+              color: desbloqueada ? textoPrincipal : textoSecundario.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
