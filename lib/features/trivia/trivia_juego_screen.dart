@@ -235,37 +235,34 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> {
                   ],
                 ),
               ),
-              // Tarjetita flotante de feedback, arriba de todo, se esfuma sola.
-              Positioned(
-                top: 8,
-                left: 0,
-                right: 0,
+              // Tarjetita flotante de feedback, centrada en toda la pantalla, se esfuma sola.
+              Positioned.fill(
                 child: AnimatedOpacity(
                   opacity: _mostrarFeedback ? 1 : 0,
                   duration: const Duration(milliseconds: 250),
                   child: IgnorePointer(
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 54, vertical: 30),
                         decoration: BoxDecoration(
                           color: acertoLaActual ? Colors.green.shade600 : Colors.red.shade600,
-                          borderRadius: BorderRadius.circular(30),
+                          borderRadius: BorderRadius.circular(24),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 3)),
+                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 16, offset: const Offset(0, 6)),
                           ],
                         ),
-                        child: Row(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               acertoLaActual ? Icons.check_circle_rounded : Icons.cancel_rounded,
                               color: Colors.white,
-                              size: 18,
+                              size: 54,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(height: 12),
                             Text(
                               acertoLaActual ? '¡Correcto!' : 'Incorrecto',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
                             ),
                           ],
                         ),
