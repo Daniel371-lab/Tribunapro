@@ -20,7 +20,8 @@ class _FormacionInfo {
   final int defensa;
   final String descripcion;
   final IconData icono;
-  const _FormacionInfo(this.nombre, this.ataque, this.defensa, this.descripcion, this.icono);
+  final List<int> lineas; // jugadores por línea (defensa → ataque)
+  const _FormacionInfo(this.nombre, this.ataque, this.defensa, this.descripcion, this.icono, this.lineas);
 }
 
 class _EstiloInfo {
@@ -69,11 +70,11 @@ const _selecciones = [
 ];
 
 const _formaciones = [
-  _FormacionInfo('4-4-2', 5, 5, 'Equilibrada', Icons.grid_view_rounded),
-  _FormacionInfo('4-3-3', 7, 3, 'Ofensiva', Icons.arrow_upward_rounded),
-  _FormacionInfo('5-4-1', 3, 7, 'Defensiva', Icons.shield_rounded),
-  _FormacionInfo('3-4-3', 8, 2, 'Ataque total', Icons.bolt_rounded),
-  _FormacionInfo('4-2-3-1', 6, 4, 'Creativa', Icons.auto_awesome_rounded),
+  _FormacionInfo('4-4-2', 5, 5, 'Equilibrada', Icons.grid_view_rounded, [4, 4, 2]),
+  _FormacionInfo('4-3-3', 7, 3, 'Ofensiva', Icons.arrow_upward_rounded, [4, 3, 3]),
+  _FormacionInfo('5-4-1', 3, 7, 'Defensiva', Icons.shield_rounded, [5, 4, 1]),
+  _FormacionInfo('3-4-3', 8, 2, 'Ataque total', Icons.bolt_rounded, [3, 4, 3]),
+  _FormacionInfo('4-2-3-1', 6, 4, 'Creativa', Icons.auto_awesome_rounded, [4, 2, 3, 1]),
 ];
 
 const _estilos = [
@@ -95,7 +96,7 @@ class MiniMundialScreen extends StatefulWidget {
   State<MiniMundialScreen> createState() => _MiniMundialScreenState();
 }
 
-class _MiniMundialScreenState extends State<MiniMundialScreen> {
+class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProviderStateMixin {
   final _random = Random();
 
   // ---- Flujo general ----
@@ -127,12 +128,29 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   bool _esMuerteSubita = false;
   final List<_DetallePenal> _detallesPenales = [];
 
-  // ---- Timers ----
+  // ---- Timers y animaciones ----
   Timer? _timerAnimacion;
+  late final AnimationController _flipController;
+  late final AnimationController _dotsRivalController;
+
+  @override
+  void initState() {
+    super.initState();
+    _flipController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _dotsRivalController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
 
   @override
   void dispose() {
     _timerAnimacion?.cancel();
+    _flipController.dispose();
+    _dotsRivalController.dispose();
     super.dispose();
   }
 
@@ -141,7 +159,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   // ---------------------------------------------------------------------------
 
   List<int> _generarMinutos() {
-    // 3 en el primer tiempo (1-45) + 3 en el segundo (46-90), ordenados.
     final primerTiempo = List.generate(3, (_) => 5 + _random.nextInt(40)).toList()..sort();
     final segundoTiempo = List.generate(3, (_) => 50 + _random.nextInt(40)).toList()..sort();
     return [...primerTiempo, ...segundoTiempo];
@@ -180,6 +197,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     _rivalFormacionTurno = null;
     _rivalEstiloTurno = null;
     _resultadoTurnoActual = null;
+    _flipController.reset();
+    _dotsRivalController.reset();
     _fase = _Fase.jugandoTurno;
   }
 
@@ -187,11 +206,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     if (_miFormacionTurno == null || _miEstiloTurno == null) return;
     HapticFeedback.selectionClick();
 
-    // El rival elige al azar en simultáneo (Opción A: a ciegas).
     final rivalForm = _formaciones[_random.nextInt(_formaciones.length)];
     final rivalEst = _estilos[_random.nextInt(_estilos.length)];
-
-    // Resolvemos el turno.
     final resultado = _resolverTurno(_miFormacionTurno!, _miEstiloTurno!, rivalForm, rivalEst);
 
     setState(() {
@@ -199,20 +215,31 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       _rivalEstiloTurno = rivalEst;
       _resultadoTurnoActual = resultado;
       _fase = _Fase.revelandoTurno;
-
-      if (resultado == _ResultadoTurno.golMio) {
-        _golesMi++;
-        HapticFeedback.mediumImpact();
-      } else if (resultado == _ResultadoTurno.golRival) {
-        _golesRival++;
-        HapticFeedback.heavyImpact();
-      }
     });
 
-    // Después de 2.2s pasamos al siguiente turno o al final.
-    _timerAnimacion = Timer(const Duration(milliseconds: 2200), () {
+    // Animación: primero aparecen los puntos del rival en la pizarra,
+    // después se voltean las cartas.
+    _dotsRivalController.forward(from: 0).then((_) {
       if (!mounted) return;
-      _avanzarTurno();
+      _flipController.forward(from: 0).then((_) {
+        if (!mounted) return;
+        // Cuando terminan las 2 animaciones, actualizamos marcador y vibramos.
+        setState(() {
+          if (resultado == _ResultadoTurno.golMio) {
+            _golesMi++;
+            HapticFeedback.mediumImpact();
+          } else if (resultado == _ResultadoTurno.golRival) {
+            _golesRival++;
+            HapticFeedback.heavyImpact();
+          }
+        });
+
+        // Esperamos un momento para que se vea el resultado y avanzamos.
+        _timerAnimacion = Timer(const Duration(milliseconds: 1400), () {
+          if (!mounted) return;
+          _avanzarTurno();
+        });
+      });
     });
   }
 
@@ -229,15 +256,14 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       _rivalEstiloTurno = null;
       _resultadoTurnoActual = null;
       _fase = _Fase.jugandoTurno;
+      _flipController.reset();
+      _dotsRivalController.reset();
     });
   }
 
   void _terminarPartido() {
-    final gane = _golesMi > _golesRival;
     final empate = _golesMi == _golesRival;
-
     if (empate) {
-      // Arrancamos penales.
       setState(() {
         _penalesMi = 0;
         _penalesRival = 0;
@@ -250,8 +276,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       });
       return;
     }
-
-    _guardarResultadoRonda(gane);
+    _guardarResultadoRonda(_golesMi > _golesRival);
     setState(() => _fase = _Fase.resultado);
   }
 
@@ -303,24 +328,20 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     final miAtaqueNeto = miAtaque - rivalDefensa;
     final rivalAtaqueNeto = rivalAtaque - miDefensa;
 
-    // Si están iguales en ataque neto.
     if (miAtaqueNeto == rivalAtaqueNeto) {
       if (miAtaqueNeto >= 2) {
-        // Desempate por ataque bruto.
         if (miAtaque > rivalAtaque) return _ResultadoTurno.golMio;
         if (rivalAtaque > miAtaque) return _ResultadoTurno.golRival;
       }
       return _ResultadoTurno.nada;
     }
 
-    // Uno tiene más ataque neto que el otro.
     if (miAtaqueNeto > rivalAtaqueNeto && miAtaqueNeto >= 2) {
       return _ResultadoTurno.golMio;
     }
     if (rivalAtaqueNeto > miAtaqueNeto && rivalAtaqueNeto >= 2) {
       return _ResultadoTurno.golRival;
     }
-
     return _ResultadoTurno.nada;
   }
 
@@ -328,39 +349,26 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   // PENALES
   // ---------------------------------------------------------------------------
 
-  // El usuario eligió dónde patear (o dónde se tira su arquero).
   void _resolverPenal(_ZonaPenal miEleccion) {
     HapticFeedback.selectionClick();
 
     if (_esTurnoMio) {
-      // Yo pateo, el arquero rival se tira al azar.
       final arqueroRival = _ZonaPenal.values[_random.nextInt(3)];
       final esGol = arqueroRival != miEleccion;
       if (esGol) _penalesMi++;
       _tirosMi++;
-      _detallesPenales.add(_DetallePenal(
-        esMio: true,
-        fueGol: esGol,
-        tiro: miEleccion,
-        arquero: arqueroRival,
-      ));
+      _detallesPenales.add(_DetallePenal(esMio: true, fueGol: esGol, tiro: miEleccion, arquero: arqueroRival));
       if (esGol) {
         HapticFeedback.mediumImpact();
       } else {
         HapticFeedback.heavyImpact();
       }
     } else {
-      // El rival patea, yo elijo dónde se tira mi arquero.
       final tiroRival = _ZonaPenal.values[_random.nextInt(3)];
       final esGol = tiroRival != miEleccion;
       if (esGol) _penalesRival++;
       _tirosRival++;
-      _detallesPenales.add(_DetallePenal(
-        esMio: false,
-        fueGol: esGol,
-        tiro: tiroRival,
-        arquero: miEleccion,
-      ));
+      _detallesPenales.add(_DetallePenal(esMio: false, fueGol: esGol, tiro: tiroRival, arquero: miEleccion));
       if (!esGol) {
         HapticFeedback.mediumImpact();
       } else {
@@ -370,7 +378,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
 
     setState(() {});
 
-    // Después de 1.5s, revisamos si continuamos o terminamos.
     _timerAnimacion = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       _avanzarPenal();
@@ -378,41 +385,28 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   }
 
   void _avanzarPenal() {
-    // ¿Terminó la tanda regular de 5?
     if (!_esMuerteSubita && _tirosMi >= 5 && _tirosRival >= 5) {
       if (_penalesMi != _penalesRival) {
-        // Alguien ganó.
         _terminarPenales();
         return;
       }
-      // Empate: pasamos a muerte súbita.
       setState(() => _esMuerteSubita = true);
     }
 
-    // ¿Es la muerte súbita y se sacaron ventaja?
     if (_esMuerteSubita) {
-      // En muerte súbita se patea uno y otro, así que se define cuando
-      // ambos patearon y hay diferencia.
       if (_tirosMi == _tirosRival && _penalesMi != _penalesRival) {
         _terminarPenales();
         return;
       }
-      // ¿Quién patea ahora?
-      if (_tirosMi == _tirosRival) {
-        setState(() => _esTurnoMio = true);
-      } else {
-        setState(() => _esTurnoMio = false);
-      }
+      setState(() => _esTurnoMio = _tirosMi == _tirosRival);
       return;
     }
 
-    // Tanda regular: alternamos entre yo y el rival.
     setState(() => _esTurnoMio = !_esTurnoMio);
   }
 
   void _terminarPenales() {
-    final gane = _penalesMi > _penalesRival;
-    _guardarResultadoRonda(gane);
+    _guardarResultadoRonda(_penalesMi > _penalesRival);
     setState(() => _fase = _Fase.resultado);
   }
 
@@ -477,12 +471,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
             const SizedBox(height: 24),
             Text(
               'Mini Mundial',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: textoPrincipal,
-                letterSpacing: -0.5,
-              ),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: -0.5),
             ),
             const SizedBox(height: 10),
             Text(
@@ -516,10 +505,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               child: FilledButton.icon(
                 onPressed: _empezar,
                 icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                label: const Text(
-                  'Comenzar',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
-                ),
+                label: const Text('Comenzar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.acento,
                   foregroundColor: Colors.white,
@@ -579,14 +565,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Elige tu selección',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textoPrincipal, letterSpacing: -0.2),
-                  ),
-                  Text(
-                    'Enfrentarás rivales al azar hasta la final',
-                    style: TextStyle(fontSize: 12, color: textoSecundario),
-                  ),
+                  Text('Elige tu selección',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textoPrincipal, letterSpacing: -0.2)),
+                  Text('Enfrentarás rivales al azar hasta la final',
+                      style: TextStyle(fontSize: 12, color: textoSecundario)),
                 ],
               ),
             ),
@@ -625,12 +607,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: textoPrincipal,
-                        height: 1.15,
-                      ),
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: textoPrincipal, height: 1.15),
                     ),
                   ],
                 ),
@@ -643,20 +620,26 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   }
 
   // ===========================================================================
-  // VISTA: PARTIDO EN VIVO (turno a turno)
+  // VISTA: PARTIDO EN VIVO
   // ===========================================================================
 
   Widget _vistaPartidoEnVivo() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
+    final revelando = _fase == _Fase.revelandoTurno;
 
     return Column(
       children: [
         _buildHeaderPartido(),
+        // Pizarra con la cancha y las formaciones
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: _buildPizarra(revelando),
+        ),
         Expanded(
           child: Container(
             color: fondo,
-            child: _fase == _Fase.jugandoTurno ? _buildPanelTurno() : _buildPanelRevelacion(),
+            child: revelando ? _buildPanelRevelacion() : _buildPanelTurno(),
           ),
         ),
       ],
@@ -680,7 +663,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       ),
       child: Column(
         children: [
-          // Marcador
           Row(
             children: [
               Expanded(
@@ -729,14 +711,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          // Reloj / momento
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.timer_outlined, size: 14, color: textoSecundario),
               const SizedBox(width: 6),
               Text(
-                minutoActual == 90 ? 'FIN DEL PARTIDO' : "Minuto $minutoActual · Ronda $_ronda de 4",
+                minutoActual == 90 ? 'FIN DEL PARTIDO' : 'Minuto $minutoActual · Ronda $_ronda de 4',
                 style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoSecundario, letterSpacing: 0.3),
               ),
             ],
@@ -746,19 +727,200 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     );
   }
 
+  // ===========================================================================
+  // PIZARRA CON LA CANCHA
+  // ===========================================================================
+
+  Widget _buildPizarra(bool revelando) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+
+    // La formación del rival en la pizarra depende de si ya se reveló.
+    final rivalFormEnPizarra = revelando ? _rivalFormacionTurno : null;
+
+    return Container(
+      height: 190,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borde, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            // Fondo verde con gradiente
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF1B6B40), Color(0xFF0E4A28)],
+                  ),
+                ),
+              ),
+            ),
+            // Líneas de la cancha
+            Positioned.fill(
+              child: CustomPaint(painter: _CanchaPainter()),
+            ),
+            // Formación del rival (arriba)
+            if (rivalFormEnPizarra != null)
+              ..._construirDotsFormacion(
+                rivalFormEnPizarra,
+                esRival: true,
+                controller: _dotsRivalController,
+              ),
+            // Mi formación (abajo)
+            if (_miFormacionTurno != null)
+              ..._construirDotsFormacion(
+                _miFormacionTurno!,
+                esRival: false,
+                controller: null,
+              ),
+            // Nombre del equipo en cada mitad
+            Positioned(
+              top: 6,
+              left: 8,
+              child: _buildPillEquipo(_rivalEquipo!.codigoBandera, _rivalEquipo!.nombre, Colors.red.shade900),
+            ),
+            Positioned(
+              bottom: 6,
+              left: 8,
+              child: _buildPillEquipo(_miEquipo!.codigoBandera, _miEquipo!.nombre, AppColors.acento),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPillEquipo(String codigoBandera, String nombre, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _banderaCircular(codigoBandera, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            nombre,
+            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Genera los dots de la formación. Si esRival, se ubican en la mitad superior.
+  // Si es la mía, en la mitad inferior.
+  List<Widget> _construirDotsFormacion(
+    _FormacionInfo formacion, {
+    required bool esRival,
+    required AnimationController? controller,
+  }) {
+    final dots = <Widget>[];
+    final lineas = formacion.lineas;
+    final totalLineas = lineas.length;
+
+    for (int i = 0; i < totalLineas; i++) {
+      final cantidad = lineas[i];
+      // i=0 es defensa, i=último es ataque.
+      // Para MI equipo (abajo): la defensa está más abajo (y alto),
+      // el ataque más arriba (y bajo).
+      // Para el RIVAL (arriba): espejado.
+      final double fraccionLinea = i / (totalLineas - 1 == 0 ? 1 : totalLineas - 1);
+
+      // Coordenada vertical (0 = arriba del todo, 1 = abajo del todo).
+      // Mi equipo: ataque arriba del 0.5, defensa cerca del 0.85.
+      // Rival: ataque cerca del 0.5, defensa cerca del 0.15.
+      final double y;
+      if (esRival) {
+        // Cuanto más alta la línea (ataque), más cerca del centro.
+        y = 0.45 - fraccionLinea * 0.35;
+      } else {
+        // Cuanto más alta la línea (ataque), más cerca del centro.
+        y = 0.55 + (1 - fraccionLinea) * 0.35;
+      }
+
+      for (int j = 0; j < cantidad; j++) {
+        final double x = (j + 1) / (cantidad + 1);
+
+        final dot = Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: esRival ? Colors.red.shade200 : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: esRival ? Colors.red.shade900 : AppColors.acento,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        );
+
+        Widget dotFinal = dot;
+        if (controller != null) {
+          // Animación de aparición para los dots del rival.
+          dotFinal = AnimatedBuilder(
+            animation: controller,
+            builder: (context, child) {
+              return Opacity(
+                opacity: controller.value,
+                child: Transform.scale(
+                  scale: 0.6 + controller.value * 0.4,
+                  child: child,
+                ),
+              );
+            },
+            child: dot,
+          );
+        }
+
+        dots.add(
+          Align(
+            alignment: Alignment(x * 2 - 1, y * 2 - 1),
+            child: dotFinal,
+          ),
+        );
+      }
+    }
+    return dots;
+  }
+
+  // ===========================================================================
+  // PANEL DE ELECCIÓN DEL TURNO
+  // ===========================================================================
+
   Widget _buildPanelTurno() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final minutoActual = _minutosClave[_indiceTurno];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -774,84 +936,86 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Momento clave del partido',
+                  'Elegí tu estrategia',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textoSecundario),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          // Formaciones
-          Text('Formación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: _formaciones.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, i) {
-                final f = _formaciones[i];
-                final elegida = _miFormacionTurno?.nombre == f.nombre;
-                return _buildCardOpcion(
-                  seleccionada: elegida,
-                  color: AppColors.acento,
-                  icono: f.icono,
-                  titulo: f.nombre,
-                  subtitulo: f.descripcion,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _miFormacionTurno = f);
-                  },
-                );
-              },
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Formación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _formaciones.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, i) {
+                      final f = _formaciones[i];
+                      final elegida = _miFormacionTurno?.nombre == f.nombre;
+                      return _buildCardOpcion(
+                        seleccionada: elegida,
+                        color: AppColors.acento,
+                        icono: f.icono,
+                        titulo: f.nombre,
+                        subtitulo: f.descripcion,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _miFormacionTurno = f);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _estilos.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, i) {
+                      final e = _estilos[i];
+                      final elegida = _miEstiloTurno?.nombre == e.nombre;
+                      return _buildCardOpcion(
+                        seleccionada: elegida,
+                        color: e.color,
+                        icono: e.icono,
+                        titulo: e.nombre,
+                        subtitulo: e.descripcion,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _miEstiloTurno = e);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 20),
-
-          // Estilos
-          Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: _estilos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, i) {
-                final e = _estilos[i];
-                final elegida = _miEstiloTurno?.nombre == e.nombre;
-                return _buildCardOpcion(
-                  seleccionada: elegida,
-                  color: e.color,
-                  icono: e.icono,
-                  titulo: e.nombre,
-                  subtitulo: e.descripcion,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _miEstiloTurno = e);
-                  },
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          SizedBox(
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SizedBox(
             width: double.infinity,
             height: 54,
             child: FilledButton.icon(
               onPressed: (_miFormacionTurno != null && _miEstiloTurno != null) ? _confirmarTurno : null,
               icon: const Icon(Icons.sports_soccer_rounded, size: 22),
-              label: const Text(
-                'Confirmar jugada',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
-              ),
+              label: const Text('Confirmar jugada', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.acento,
                 foregroundColor: Colors.white,
@@ -862,8 +1026,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -895,6 +1059,15 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
             color: seleccionada ? color : borde,
             width: seleccionada ? 1.8 : 0.8,
           ),
+          boxShadow: seleccionada
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.20),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -912,18 +1085,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                   child: Icon(icono, size: 14, color: seleccionada ? Colors.white : color),
                 ),
                 const Spacer(),
-                if (seleccionada)
-                  Icon(Icons.check_circle_rounded, size: 16, color: color),
+                if (seleccionada) Icon(Icons.check_circle_rounded, size: 16, color: color),
               ],
             ),
             const SizedBox(height: 6),
             Text(
               titulo,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: seleccionada ? color : textoPrincipal,
-              ),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -940,15 +1108,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   }
 
   // ===========================================================================
-  // VISTA: REVELACIÓN DEL TURNO
+  // PANEL DE REVELACIÓN (con cartas volteadas)
   // ===========================================================================
 
   Widget _buildPanelRevelacion() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
-    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
-    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
     final resultado = _resultadoTurnoActual;
     final esGol = resultado == _ResultadoTurno.golMio || resultado == _ResultadoTurno.golRival;
@@ -972,118 +1138,285 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     };
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         children: [
-          // Elección del rival
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: superficie,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borde, width: 0.8),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'El rival eligió',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario),
+          // Cartas enfrentadas (con flip)
+          Row(
+            children: [
+              // Mi carta de formación + estilo
+              Expanded(child: _buildMiJugadaCarta()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'VS',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textoSecundario, letterSpacing: 1),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppColors.acento.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(_rivalFormacionTurno?.icono ?? Icons.grid_view_rounded, size: 16, color: AppColors.acento),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Formación', style: TextStyle(fontSize: 10, color: textoSecundario)),
-                              Text(_rivalFormacionTurno?.nombre ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: _rivalEstiloTurno?.color.withValues(alpha: 0.12) ?? Colors.grey.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(_rivalEstiloTurno?.icono ?? Icons.bolt_rounded, size: 16, color: _rivalEstiloTurno?.color ?? Colors.grey),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Estilo', style: TextStyle(fontSize: 10, color: textoSecundario)),
-                              Text(_rivalEstiloTurno?.nombre ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const Spacer(),
-
-          // Resultado del turno (animado)
-          AnimatedScale(
-            scale: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
-              decoration: BoxDecoration(
-                color: colorResultado.withValues(alpha: esGol ? 0.14 : 0.06),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: colorResultado.withValues(alpha: 0.4), width: 1.5),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(iconoResultado, size: 46, color: colorResultado),
-                  const SizedBox(height: 10),
-                  Text(
-                    textResultado,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: colorResultado,
-                      letterSpacing: 0.5,
+              // Cartas del rival (flip)
+              Expanded(child: _buildRivalJugadaCarta()),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Resultado
+          AnimatedBuilder(
+            animation: _flipController,
+            builder: (context, _) {
+              // Mostramos el resultado solo cuando el flip del rival terminó.
+              final mostrarResultado = _flipController.value >= 1.0;
+              return AnimatedOpacity(
+                opacity: mostrarResultado ? 1 : 0,
+                duration: const Duration(milliseconds: 300),
+                child: AnimatedScale(
+                  scale: mostrarResultado ? 1.0 : 0.8,
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: colorResultado.withValues(alpha: esGol ? 0.14 : 0.06),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: colorResultado.withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(iconoResultado, size: 40, color: colorResultado),
+                        const SizedBox(height: 8),
+                        Text(
+                          textResultado,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: colorResultado,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (esGol) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_golesMi - $_golesRival',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (esGol) ...[
-                    const SizedBox(height: 6),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Mi jugada (carta revelada, sin flip).
+  Widget _buildMiJugadaCarta() {
+    return Column(
+      children: [
+        _buildCartaVolteada(
+          color: AppColors.acento,
+          icono: _miFormacionTurno?.icono ?? Icons.grid_view_rounded,
+          titulo: _miFormacionTurno?.nombre ?? '',
+          subtitulo: 'Formación',
+        ),
+        const SizedBox(height: 8),
+        _buildCartaVolteada(
+          color: _miEstiloTurno?.color ?? AppColors.acento,
+          icono: _miEstiloTurno?.icono ?? Icons.bolt_rounded,
+          titulo: _miEstiloTurno?.nombre ?? '',
+          subtitulo: 'Estilo',
+        ),
+      ],
+    );
+  }
+
+  // Cartas del rival con animación de flip. Empiezan boca abajo.
+  Widget _buildRivalJugadaCarta() {
+    return AnimatedBuilder(
+      animation: _flipController,
+      builder: (context, _) {
+        final angle = _flipController.value * pi;
+        final mostrarFrente = angle > pi / 2;
+
+        return Column(
+          children: [
+            _buildCartaConFlip(
+              angulo: angle,
+              mostrarFrente: mostrarFrente,
+              color: const Color(0xFFE63946),
+              icono: _rivalFormacionTurno?.icono ?? Icons.grid_view_rounded,
+              titulo: _rivalFormacionTurno?.nombre ?? '',
+              subtitulo: 'Formación',
+            ),
+            const SizedBox(height: 8),
+            _buildCartaConFlip(
+              angulo: angle,
+              mostrarFrente: mostrarFrente,
+              color: _rivalEstiloTurno?.color ?? const Color(0xFFE63946),
+              icono: _rivalEstiloTurno?.icono ?? Icons.bolt_rounded,
+              titulo: _rivalEstiloTurno?.nombre ?? '',
+              subtitulo: 'Estilo',
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCartaConFlip({
+    required double angulo,
+    required bool mostrarFrente,
+    required Color color,
+    required IconData icono,
+    required String titulo,
+    required String subtitulo,
+  }) {
+    return Transform(
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.001)
+        ..rotateY(angulo),
+      alignment: Alignment.center,
+      child: mostrarFrente
+          ? Transform(
+              // Contra-rotación para que el frente no quede espejado.
+              transform: Matrix4.identity()..rotateY(pi),
+              alignment: Alignment.center,
+              child: _buildCartaVolteada(color: color, icono: icono, titulo: titulo, subtitulo: subtitulo),
+            )
+          : _buildCartaDorso(),
+    );
+  }
+
+  // Carta revelada (frente).
+  Widget _buildCartaVolteada({
+    required Color color,
+    required IconData icono,
+    required String titulo,
+    required String subtitulo,
+  }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icono, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      '$_golesMi - $_golesRival',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
+                      subtitulo,
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: textoSecundario),
+                    ),
+                    Text(
+                      titulo,
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: textoPrincipal),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+        ],
+      ),
+    );
+  }
 
-          const Spacer(),
+  // Carta boca abajo (dorso).
+  Widget _buildCartaDorso() {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: esOscuro
+              ? [const Color(0xFF3A1F24), const Color(0xFF1F1114)]
+              : [const Color(0xFF8B1A29), const Color(0xFF5A1018)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE63946).withValues(alpha: 0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE63946).withValues(alpha: 0.20),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.help_outline_rounded, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ELEGIDA',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const Text(
+                      '???',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1099,40 +1432,23 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
 
-    final mostrarResultado = _detallesPenales.isNotEmpty &&
-        _timerAnimacion?.isActive == true;
+    final mostrarResultado = _detallesPenales.isNotEmpty && _timerAnimacion?.isActive == true;
 
     return Container(
       color: fondo,
       child: Column(
         children: [
-          // Marcador de penales
           Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
               color: esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro,
-              border: Border(
-                bottom: BorderSide(
-                  color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro,
-                  width: 0.8,
-                ),
-              ),
+              border: Border(bottom: BorderSide(color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro, width: 0.8)),
             ),
             child: Column(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _esMuerteSubita ? 'MUERTE SÚBITA' : 'PENALES',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.pro,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ],
+                Text(
+                  _esMuerteSubita ? 'MUERTE SÚBITA' : 'PENALES',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.pro, letterSpacing: 2),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -1183,7 +1499,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Historial de tiros (burbujas)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
@@ -1229,10 +1544,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       return Container(
         width: 16,
         height: 16,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: borde, width: 1.5),
-        ),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: borde, width: 1.5)),
       );
     }
     return Container(
@@ -1242,11 +1554,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
         shape: BoxShape.circle,
         color: detalle.fueGol ? const Color(0xFF2E9E5B) : const Color(0xFFE63946),
       ),
-      child: Icon(
-        detalle.fueGol ? Icons.check_rounded : Icons.close_rounded,
-        size: 10,
-        color: Colors.white,
-      ),
+      child: Icon(detalle.fueGol ? Icons.check_rounded : Icons.close_rounded, size: 10, color: Colors.white),
     );
   }
 
@@ -1262,18 +1570,16 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            _esTurnoMio
-                ? 'Elige dónde patear'
-                : 'Elige dónde se tira tu arquero',
+            _esTurnoMio ? 'Elige dónde patear' : 'Elige dónde se tira tu arquero',
             style: TextStyle(fontSize: 13, color: textoSecundario),
           ),
           const SizedBox(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildBotonZona(_ZonaPenal.izquierda, esOscuro),
-              _buildBotonZona(_ZonaPenal.centro, esOscuro),
-              _buildBotonZona(_ZonaPenal.derecha, esOscuro),
+              _buildBotonZona(_ZonaPenal.izquierda),
+              _buildBotonZona(_ZonaPenal.centro),
+              _buildBotonZona(_ZonaPenal.derecha),
             ],
           ),
         ],
@@ -1281,7 +1587,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     );
   }
 
-  Widget _buildBotonZona(_ZonaPenal zona, bool esOscuro) {
+  Widget _buildBotonZona(_ZonaPenal zona) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final icono = switch (zona) {
       _ZonaPenal.izquierda => Icons.arrow_back_rounded,
@@ -1350,10 +1657,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            texto,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color),
-          ),
+          Text(texto, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
         ],
       ),
     );
@@ -1385,7 +1689,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Timeline del torneo
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(4, (i) {
@@ -1393,7 +1696,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                 final yaJugo = i < _historialRondas.length;
                 final gano = yaJugo && _historialRondas[i];
                 final esActual = numeroRonda == _ronda;
-
                 Color colorRonda;
                 if (yaJugo) {
                   colorRonda = gano ? const Color(0xFF2E9E5B) : const Color(0xFFE63946);
@@ -1402,7 +1704,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                 } else {
                   colorRonda = borde;
                 }
-
                 return Row(
                   children: [
                     Column(
@@ -1422,26 +1723,16 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          _etiquetaRonda(numeroRonda),
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: textoSecundario),
-                        ),
+                        Text(_etiquetaRonda(numeroRonda), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: textoSecundario)),
                       ],
                     ),
                     if (numeroRonda < 4)
-                      Container(
-                        width: 18,
-                        height: 2,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        color: yaJugo ? colorRonda.withValues(alpha: 0.4) : borde,
-                      ),
+                      Container(width: 18, height: 2, margin: const EdgeInsets.only(bottom: 16), color: yaJugo ? colorRonda.withValues(alpha: 0.4) : borde),
                   ],
                 );
               }),
             ),
             const SizedBox(height: 30),
-
-            // Ícono/emoji del resultado
             Container(
               width: 110,
               height: 110,
@@ -1452,47 +1743,31 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                   end: Alignment.bottomRight,
                   colors: [color, color.withValues(alpha: 0.65)],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.40),
-                    blurRadius: 26,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.40), blurRadius: 26, offset: const Offset(0, 10))],
               ),
               child: Center(
                 child: esCampeon
                     ? const Text('🏆', style: TextStyle(fontSize: 52))
-                    : Icon(
-                        gane ? Icons.emoji_events_rounded : Icons.sentiment_dissatisfied_rounded,
-                        size: 56,
-                        color: Colors.white,
-                      ),
+                    : Icon(gane ? Icons.emoji_events_rounded : Icons.sentiment_dissatisfied_rounded, size: 56, color: Colors.white),
               ),
             ),
             const SizedBox(height: 22),
-
             Text(
               esCampeon ? '¡Campeón!' : (gane ? '¡Victoria!' : 'Eliminado'),
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5),
             ),
             const SizedBox(height: 10),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _banderaCircular(_miEquipo!.codigoBandera, size: 32),
                 const SizedBox(width: 12),
-                Text(
-                  marcadorTexto,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
-                ),
+                Text(marcadorTexto, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2)),
                 const SizedBox(width: 12),
                 _banderaCircular(_rivalEquipo!.codigoBandera, size: 32),
               ],
             ),
             const SizedBox(height: 12),
-
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -1510,20 +1785,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textoSecundario),
               ),
             ),
-
             const SizedBox(height: 30),
-
             SizedBox(
               width: double.infinity,
               height: 54,
               child: FilledButton.icon(
-                onPressed: esCampeon
-                    ? _reiniciarTorneo
-                    : (gane ? _siguienteRonda : _reiniciarTorneo),
-                icon: Icon(
-                  esCampeon ? Icons.refresh_rounded : (gane ? Icons.arrow_forward_rounded : Icons.replay_rounded),
-                  size: 20,
-                ),
+                onPressed: esCampeon ? _reiniciarTorneo : (gane ? _siguienteRonda : _reiniciarTorneo),
+                icon: Icon(esCampeon ? Icons.refresh_rounded : (gane ? Icons.arrow_forward_rounded : Icons.replay_rounded), size: 20),
                 label: Text(
                   esCampeon ? 'Jugar de nuevo' : (gane ? 'Siguiente ronda' : 'Intentar de nuevo'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
@@ -1590,4 +1858,48 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       ),
     );
   }
+}
+
+// ============================================================================
+// PAINTER DE LA CANCHA
+// ============================================================================
+
+class _CanchaPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.20)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    // Borde
+    final margen = 8.0;
+    final rect = Rect.fromLTWH(margen, margen, size.width - margen * 2, size.height - margen * 2);
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
+
+    // Línea del medio
+    canvas.drawLine(Offset(margen, size.height / 2), Offset(size.width - margen, size.height / 2), paint);
+
+    // Círculo central
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 22, paint);
+
+    // Área grande arriba
+    final areaAncho = size.width * 0.45;
+    final areaAlto = size.height * 0.13;
+    canvas.drawRect(Rect.fromLTWH((size.width - areaAncho) / 2, margen, areaAncho, areaAlto), paint);
+
+    // Área grande abajo
+    canvas.drawRect(Rect.fromLTWH((size.width - areaAncho) / 2, size.height - margen - areaAlto, areaAncho, areaAlto), paint);
+
+    // Área chica arriba
+    final areaChicaAncho = size.width * 0.24;
+    final areaChicaAlto = size.height * 0.06;
+    canvas.drawRect(Rect.fromLTWH((size.width - areaChicaAncho) / 2, margen, areaChicaAncho, areaChicaAlto), paint);
+
+    // Área chica abajo
+    canvas.drawRect(Rect.fromLTWH((size.width - areaChicaAncho) / 2, size.height - margen - areaChicaAlto, areaChicaAncho, areaChicaAlto), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
