@@ -4,11 +4,50 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/theme/app_colors.dart';
 
+// ============================================================================
+// MODELOS
+// ============================================================================
+
 class _Seleccion {
   final String nombre;
   final String codigoBandera;
   const _Seleccion(this.nombre, this.codigoBandera);
 }
+
+class _FormacionInfo {
+  final String nombre;
+  final int ataque;
+  final int defensa;
+  final String descripcion;
+  final IconData icono;
+  const _FormacionInfo(this.nombre, this.ataque, this.defensa, this.descripcion, this.icono);
+}
+
+class _EstiloInfo {
+  final String nombre;
+  final int ataqueBonus;
+  final int defensaBonus;
+  final String descripcion;
+  final IconData icono;
+  final Color color;
+  const _EstiloInfo(this.nombre, this.ataqueBonus, this.defensaBonus, this.descripcion, this.icono, this.color);
+}
+
+enum _ResultadoTurno { golMio, golRival, nada }
+enum _Fase { bienvenida, eligiendoEquipo, jugandoTurno, revelandoTurno, penales, resultado }
+enum _ZonaPenal { izquierda, centro, derecha }
+
+class _DetallePenal {
+  final bool esMio;
+  final bool fueGol;
+  final _ZonaPenal tiro;
+  final _ZonaPenal arquero;
+  const _DetallePenal({required this.esMio, required this.fueGol, required this.tiro, required this.arquero});
+}
+
+// ============================================================================
+// DATOS
+// ============================================================================
 
 const _selecciones = [
   _Seleccion('Argentina', 'ar'),
@@ -29,50 +68,25 @@ const _selecciones = [
   _Seleccion('Japón', 'jp'),
 ];
 
-const _formaciones = ['4-4-2', '4-3-3', '5-4-1', '3-4-3', '4-2-3-1'];
-
-class _FormacionInfo {
-  final String nombre;
-  final String descripcion;
-  final IconData icono;
-  final List<int> lineas; // jugadores por línea (defensa, medios, ataque...)
-  const _FormacionInfo(this.nombre, this.descripcion, this.icono, this.lineas);
-}
-
-const _formacionesInfo = [
-  _FormacionInfo('4-4-2', 'Equilibrada', Icons.grid_view_rounded, [4, 4, 2]),
-  _FormacionInfo('4-3-3', 'Ofensiva', Icons.arrow_upward_rounded, [4, 3, 3]),
-  _FormacionInfo('5-4-1', 'Defensiva', Icons.shield_rounded, [5, 4, 1]),
-  _FormacionInfo('3-4-3', 'Ataque total', Icons.bolt_rounded, [3, 4, 3]),
-  _FormacionInfo('4-2-3-1', 'Creativa', Icons.auto_awesome_rounded, [4, 2, 3, 1]),
+const _formaciones = [
+  _FormacionInfo('4-4-2', 5, 5, 'Equilibrada', Icons.grid_view_rounded),
+  _FormacionInfo('4-3-3', 7, 3, 'Ofensiva', Icons.arrow_upward_rounded),
+  _FormacionInfo('5-4-1', 3, 7, 'Defensiva', Icons.shield_rounded),
+  _FormacionInfo('3-4-3', 8, 2, 'Ataque total', Icons.bolt_rounded),
+  _FormacionInfo('4-2-3-1', 6, 4, 'Creativa', Icons.auto_awesome_rounded),
 ];
 
-class _EstiloInfo {
-  final String nombre;
-  final String descripcion;
-  final IconData icono;
-  final Color color;
-  const _EstiloInfo(this.nombre, this.descripcion, this.icono, this.color);
-}
-
-const _estilosInfo = [
-  _EstiloInfo('Posesión', 'Controlá el balón', Icons.psychology_rounded, Color(0xFF3B82F6)),
-  _EstiloInfo('Contraataque', 'Esperá y explotá', Icons.bolt_rounded, Color(0xFFE8B923)),
-  _EstiloInfo('Presión Alta', 'Asfixiá al rival', Icons.local_fire_department_rounded, Color(0xFFE63946)),
-  _EstiloInfo('Juego de Bandas', 'Jugá por los costados', Icons.swap_horiz_rounded, Color(0xFF8B5CF6)),
-  _EstiloInfo('Defensa Cerrada', 'Cerrá el arco', Icons.shield_rounded, Color(0xFF2E9E5B)),
+const _estilos = [
+  _EstiloInfo('Posesión', 2, 1, 'Controlá el balón', Icons.psychology_rounded, Color(0xFF3B82F6)),
+  _EstiloInfo('Contraataque', 1, 2, 'Esperá y explotá', Icons.bolt_rounded, Color(0xFFE8B923)),
+  _EstiloInfo('Presión Alta', 3, 0, 'Asfixiá al rival', Icons.local_fire_department_rounded, Color(0xFFE63946)),
+  _EstiloInfo('Juego de Bandas', 2, 0, 'Jugá por los costados', Icons.swap_horiz_rounded, Color(0xFF8B5CF6)),
+  _EstiloInfo('Defensa Cerrada', 0, 3, 'Cerrá el arco', Icons.shield_rounded, Color(0xFF2E9E5B)),
 ];
 
-// Para cada estilo, los dos que le gana.
-const _vence = {
-  'Posesión': ['Contraataque', 'Presión Alta'],
-  'Contraataque': ['Presión Alta', 'Juego de Bandas'],
-  'Presión Alta': ['Juego de Bandas', 'Defensa Cerrada'],
-  'Juego de Bandas': ['Defensa Cerrada', 'Posesión'],
-  'Defensa Cerrada': ['Posesión', 'Contraataque'],
-};
-
-enum _Fase { bienvenida, eligiendoEquipo, eligiendoJugada, resolviendo, resultado }
+// ============================================================================
+// WIDGET
+// ============================================================================
 
 class MiniMundialScreen extends StatefulWidget {
   const MiniMundialScreen({super.key});
@@ -83,33 +97,59 @@ class MiniMundialScreen extends StatefulWidget {
 
 class _MiniMundialScreenState extends State<MiniMundialScreen> {
   final _random = Random();
+
+  // ---- Flujo general ----
   _Fase _fase = _Fase.bienvenida;
-
-  late _Seleccion _miEquipo;
-  late _Seleccion _rivalEquipo;
+  _Seleccion? _miEquipo;
+  _Seleccion? _rivalEquipo;
   int _ronda = 1;
-
-  String? _miFormacion;
-  String? _miEstilo;
-  String? _rivalEstilo;
-
-  String _marcadorTexto = '';
-  String _marcadorSorteo = '';
-  bool _mostrandoPenales = false;
-  bool? _gane;
-
-  // Historial de rondas: true = gané, false = perdí.
   final List<bool> _historialRondas = [];
 
-  Timer? _timer;
-  Timer? _timerSorteo;
+  // ---- Partido ----
+  int _golesMi = 0;
+  int _golesRival = 0;
+  List<int> _minutosClave = [];
+  int _indiceTurno = 0;
+
+  // ---- Turno actual ----
+  _FormacionInfo? _miFormacionTurno;
+  _EstiloInfo? _miEstiloTurno;
+  _FormacionInfo? _rivalFormacionTurno;
+  _EstiloInfo? _rivalEstiloTurno;
+  _ResultadoTurno? _resultadoTurnoActual;
+
+  // ---- Penales ----
+  int _penalesMi = 0;
+  int _penalesRival = 0;
+  int _tirosMi = 0;
+  int _tirosRival = 0;
+  bool _esTurnoMio = true;
+  bool _esMuerteSubita = false;
+  final List<_DetallePenal> _detallesPenales = [];
+
+  // ---- Timers ----
+  Timer? _timerAnimacion;
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _timerSorteo?.cancel();
+    _timerAnimacion?.cancel();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // GENERADOR DE MINUTOS
+  // ---------------------------------------------------------------------------
+
+  List<int> _generarMinutos() {
+    // 3 en el primer tiempo (1-45) + 3 en el segundo (46-90), ordenados.
+    final primerTiempo = List.generate(3, (_) => 5 + _random.nextInt(40)).toList()..sort();
+    final segundoTiempo = List.generate(3, (_) => 50 + _random.nextInt(40)).toList()..sort();
+    return [...primerTiempo, ...segundoTiempo];
+  }
+
+  // ---------------------------------------------------------------------------
+  // FLUJO DE FASES
+  // ---------------------------------------------------------------------------
 
   void _empezar() {
     setState(() {
@@ -125,133 +165,101 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       _miEquipo = equipo;
       _rivalEquipo = restantes[_random.nextInt(restantes.length)];
       _ronda = 1;
-      _miFormacion = null;
-      _miEstilo = null;
       _historialRondas.clear();
-      _fase = _Fase.eligiendoJugada;
+      _iniciarPartido();
     });
   }
 
-  void _jugar() {
-    if (_miFormacion == null || _miEstilo == null) return;
-    HapticFeedback.lightImpact();
-
-    _rivalEstilo = _estilosInfo[_random.nextInt(_estilosInfo.length)].nombre;
-    setState(() {
-      _fase = _Fase.resolviendo;
-      _marcadorTexto = '';
-      _marcadorSorteo = '';
-      _mostrandoPenales = false;
-      _gane = null;
-    });
-
-    // Arrancamos el sorteo visual: cambia números rápido durante 1s.
-    _iniciarSorteo();
+  void _iniciarPartido() {
+    _golesMi = 0;
+    _golesRival = 0;
+    _minutosClave = _generarMinutos();
+    _indiceTurno = 0;
+    _miFormacionTurno = null;
+    _miEstiloTurno = null;
+    _rivalFormacionTurno = null;
+    _rivalEstiloTurno = null;
+    _resultadoTurnoActual = null;
+    _fase = _Fase.jugandoTurno;
   }
 
-  void _iniciarSorteo() {
-    const opciones = ['1-0', '0-1', '2-1', '1-2', '2-0', '0-2', '1-1', '0-0'];
-    int contador = 0;
-    _timerSorteo = Timer.periodic(const Duration(milliseconds: 80), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      contador++;
-      setState(() {
-        _marcadorSorteo = opciones[_random.nextInt(opciones.length)];
-      });
-      if (contador >= 12) {
-        timer.cancel();
-        _resolverPartido();
-      }
-    });
-  }
+  void _confirmarTurno() {
+    if (_miFormacionTurno == null || _miEstiloTurno == null) return;
+    HapticFeedback.selectionClick();
 
-  void _resolverPartido() {
-    const misGanadores5 = ['1-0', '2-0', '2-1', '3-0', '3-1'];
-    const rivalGanadores5 = ['0-1', '0-2', '1-2', '0-3', '1-3'];
-    const misGanadores3 = ['1-0', '2-1', '2-0'];
-    const rivalGanadores3 = ['0-1', '1-2', '0-2'];
-    const empates = ['0-0', '1-1', '2-2'];
+    // El rival elige al azar en simultáneo (Opción A: a ciegas).
+    final rivalForm = _formaciones[_random.nextInt(_formaciones.length)];
+    final rivalEst = _estilos[_random.nextInt(_estilos.length)];
 
-    bool? gane;
-    String marcador;
-    bool esEmpate = false;
-
-    if (_miEstilo == _rivalEstilo) {
-      final ganoUsuario = _random.nextBool();
-      gane = ganoUsuario;
-      marcador = ganoUsuario
-          ? misGanadores3[_random.nextInt(3)]
-          : rivalGanadores3[_random.nextInt(3)];
-    } else if (_vence[_miEstilo]!.contains(_rivalEstilo)) {
-      final opcion = _random.nextInt(6);
-      if (opcion == 5) {
-        esEmpate = true;
-        marcador = empates[_random.nextInt(3)];
-      } else {
-        gane = true;
-        marcador = misGanadores5[opcion];
-      }
-    } else {
-      final opcion = _random.nextInt(6);
-      if (opcion == 5) {
-        esEmpate = true;
-        marcador = empates[_random.nextInt(3)];
-      } else {
-        gane = false;
-        marcador = rivalGanadores5[opcion];
-      }
-    }
+    // Resolvemos el turno.
+    final resultado = _resolverTurno(_miFormacionTurno!, _miEstiloTurno!, rivalForm, rivalEst);
 
     setState(() {
-      _marcadorTexto = marcador;
-      _gane = gane;
-      _marcadorSorteo = '';
+      _rivalFormacionTurno = rivalForm;
+      _rivalEstiloTurno = rivalEst;
+      _resultadoTurnoActual = resultado;
+      _fase = _Fase.revelandoTurno;
+
+      if (resultado == _ResultadoTurno.golMio) {
+        _golesMi++;
+        HapticFeedback.mediumImpact();
+      } else if (resultado == _ResultadoTurno.golRival) {
+        _golesRival++;
+        HapticFeedback.heavyImpact();
+      }
     });
 
-    if (esEmpate) {
-      _timer = Timer(const Duration(milliseconds: 1300), () {
-        if (!mounted) return;
-        setState(() => _mostrandoPenales = true);
-        _timer = Timer(const Duration(milliseconds: 1300), _resolverPenales);
-      });
-    } else {
-      _timer = Timer(const Duration(milliseconds: 900), () {
-        if (!mounted) return;
-        _guardarResultadoRonda(gane == true);
-        setState(() => _fase = _Fase.resultado);
-      });
-    }
-  }
-
-  void _resolverPenales() {
-    const misGanadoresPenal = ['4-3', '5-4', '5-3'];
-    const rivalGanadoresPenal = ['3-4', '4-5', '3-5'];
-
-    final ganoUsuario = _random.nextBool();
-    setState(() {
-      _gane = ganoUsuario;
-      _marcadorTexto = ganoUsuario
-          ? misGanadoresPenal[_random.nextInt(3)]
-          : rivalGanadoresPenal[_random.nextInt(3)];
-    });
-
-    _timer = Timer(const Duration(milliseconds: 900), () {
+    // Después de 2.2s pasamos al siguiente turno o al final.
+    _timerAnimacion = Timer(const Duration(milliseconds: 2200), () {
       if (!mounted) return;
-      _guardarResultadoRonda(ganoUsuario);
-      setState(() => _fase = _Fase.resultado);
+      _avanzarTurno();
     });
+  }
+
+  void _avanzarTurno() {
+    if (_indiceTurno >= 5) {
+      _terminarPartido();
+      return;
+    }
+    setState(() {
+      _indiceTurno++;
+      _miFormacionTurno = null;
+      _miEstiloTurno = null;
+      _rivalFormacionTurno = null;
+      _rivalEstiloTurno = null;
+      _resultadoTurnoActual = null;
+      _fase = _Fase.jugandoTurno;
+    });
+  }
+
+  void _terminarPartido() {
+    final gane = _golesMi > _golesRival;
+    final empate = _golesMi == _golesRival;
+
+    if (empate) {
+      // Arrancamos penales.
+      setState(() {
+        _penalesMi = 0;
+        _penalesRival = 0;
+        _tirosMi = 0;
+        _tirosRival = 0;
+        _esTurnoMio = true;
+        _esMuerteSubita = false;
+        _detallesPenales.clear();
+        _fase = _Fase.penales;
+      });
+      return;
+    }
+
+    _guardarResultadoRonda(gane);
+    setState(() => _fase = _Fase.resultado);
   }
 
   void _guardarResultadoRonda(bool gane) {
-    // Ajustamos el historial para que su largo coincida con la ronda actual.
     while (_historialRondas.length < _ronda - 1) {
-      _historialRondas.add(true); // relleno por si hubo algún salto
+      _historialRondas.add(true);
     }
     _historialRondas.add(gane);
-
     if (gane) {
       HapticFeedback.mediumImpact();
     } else {
@@ -261,13 +269,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
 
   void _siguienteRonda() {
     if (_ronda >= 4) return;
-    final restantes = _selecciones.where((s) => s.nombre != _miEquipo.nombre).toList();
+    final restantes = _selecciones.where((s) => s.nombre != _miEquipo!.nombre).toList();
     setState(() {
       _ronda++;
       _rivalEquipo = restantes[_random.nextInt(restantes.length)];
-      _miFormacion = null;
-      _miEstilo = null;
-      _fase = _Fase.eligiendoJugada;
+      _iniciarPartido();
     });
   }
 
@@ -279,6 +285,141 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // LÓGICA DEL TURNO
+  // ---------------------------------------------------------------------------
+
+  _ResultadoTurno _resolverTurno(
+    _FormacionInfo miForm,
+    _EstiloInfo miEst,
+    _FormacionInfo rivalForm,
+    _EstiloInfo rivalEst,
+  ) {
+    final miAtaque = miForm.ataque + miEst.ataqueBonus;
+    final miDefensa = miForm.defensa + miEst.defensaBonus;
+    final rivalAtaque = rivalForm.ataque + rivalEst.ataqueBonus;
+    final rivalDefensa = rivalForm.defensa + rivalEst.defensaBonus;
+
+    final miAtaqueNeto = miAtaque - rivalDefensa;
+    final rivalAtaqueNeto = rivalAtaque - miDefensa;
+
+    // Si están iguales en ataque neto.
+    if (miAtaqueNeto == rivalAtaqueNeto) {
+      if (miAtaqueNeto >= 2) {
+        // Desempate por ataque bruto.
+        if (miAtaque > rivalAtaque) return _ResultadoTurno.golMio;
+        if (rivalAtaque > miAtaque) return _ResultadoTurno.golRival;
+      }
+      return _ResultadoTurno.nada;
+    }
+
+    // Uno tiene más ataque neto que el otro.
+    if (miAtaqueNeto > rivalAtaqueNeto && miAtaqueNeto >= 2) {
+      return _ResultadoTurno.golMio;
+    }
+    if (rivalAtaqueNeto > miAtaqueNeto && rivalAtaqueNeto >= 2) {
+      return _ResultadoTurno.golRival;
+    }
+
+    return _ResultadoTurno.nada;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PENALES
+  // ---------------------------------------------------------------------------
+
+  // El usuario eligió dónde patear (o dónde se tira su arquero).
+  void _resolverPenal(_ZonaPenal miEleccion) {
+    HapticFeedback.selectionClick();
+
+    if (_esTurnoMio) {
+      // Yo pateo, el arquero rival se tira al azar.
+      final arqueroRival = _ZonaPenal.values[_random.nextInt(3)];
+      final esGol = arqueroRival != miEleccion;
+      if (esGol) _penalesMi++;
+      _tirosMi++;
+      _detallesPenales.add(_DetallePenal(
+        esMio: true,
+        fueGol: esGol,
+        tiro: miEleccion,
+        arquero: arqueroRival,
+      ));
+      if (esGol) {
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.heavyImpact();
+      }
+    } else {
+      // El rival patea, yo elijo dónde se tira mi arquero.
+      final tiroRival = _ZonaPenal.values[_random.nextInt(3)];
+      final esGol = tiroRival != miEleccion;
+      if (esGol) _penalesRival++;
+      _tirosRival++;
+      _detallesPenales.add(_DetallePenal(
+        esMio: false,
+        fueGol: esGol,
+        tiro: tiroRival,
+        arquero: miEleccion,
+      ));
+      if (!esGol) {
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.heavyImpact();
+      }
+    }
+
+    setState(() {});
+
+    // Después de 1.5s, revisamos si continuamos o terminamos.
+    _timerAnimacion = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      _avanzarPenal();
+    });
+  }
+
+  void _avanzarPenal() {
+    // ¿Terminó la tanda regular de 5?
+    if (!_esMuerteSubita && _tirosMi >= 5 && _tirosRival >= 5) {
+      if (_penalesMi != _penalesRival) {
+        // Alguien ganó.
+        _terminarPenales();
+        return;
+      }
+      // Empate: pasamos a muerte súbita.
+      setState(() => _esMuerteSubita = true);
+    }
+
+    // ¿Es la muerte súbita y se sacaron ventaja?
+    if (_esMuerteSubita) {
+      // En muerte súbita se patea uno y otro, así que se define cuando
+      // ambos patearon y hay diferencia.
+      if (_tirosMi == _tirosRival && _penalesMi != _penalesRival) {
+        _terminarPenales();
+        return;
+      }
+      // ¿Quién patea ahora?
+      if (_tirosMi == _tirosRival) {
+        setState(() => _esTurnoMio = true);
+      } else {
+        setState(() => _esTurnoMio = false);
+      }
+      return;
+    }
+
+    // Tanda regular: alternamos entre yo y el rival.
+    setState(() => _esTurnoMio = !_esTurnoMio);
+  }
+
+  void _terminarPenales() {
+    final gane = _penalesMi > _penalesRival;
+    _guardarResultadoRonda(gane);
+    setState(() => _fase = _Fase.resultado);
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     switch (_fase) {
@@ -286,10 +427,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
         return _vistaBienvenida();
       case _Fase.eligiendoEquipo:
         return _vistaElegirEquipo();
-      case _Fase.eligiendoJugada:
-        return _vistaElegirJugada();
-      case _Fase.resolviendo:
-        return _vistaResolviendo();
+      case _Fase.jugandoTurno:
+      case _Fase.revelandoTurno:
+        return _vistaPartidoEnVivo();
+      case _Fase.penales:
+        return _vistaPenales();
       case _Fase.resultado:
         return _vistaResultado();
     }
@@ -317,13 +459,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFFE8B923),
-                    const Color(0xFFE8B923).withValues(alpha: 0.65),
-                  ],
+                  colors: [Color(0xFFE8B923), Color(0xFFB58A0F)],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -362,11 +501,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _miniInfo('4', 'Rondas'),
-                  _separadorInfo(borde),
-                  _miniInfo('16', 'Selecciones'),
-                  _separadorInfo(borde),
-                  _miniInfo('5', 'Estrategias'),
+                  _miniInfo('4', 'Rondas', textoPrincipal, textoSecundario),
+                  Container(width: 1, height: 28, color: borde),
+                  _miniInfo('6', 'Momentos', textoPrincipal, textoSecundario),
+                  Container(width: 1, height: 28, color: borde),
+                  _miniInfo('5', 'Estrategias', textoPrincipal, textoSecundario),
                 ],
               ),
             ),
@@ -396,10 +535,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     );
   }
 
-  Widget _miniInfo(String valor, String etiqueta) {
-    final esOscuro = Theme.of(context).brightness == Brightness.dark;
-    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
-    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+  Widget _miniInfo(String valor, String etiqueta, Color textoPrincipal, Color textoSecundario) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
@@ -410,10 +546,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
         ],
       ),
     );
-  }
-
-  Widget _separadorInfo(Color borde) {
-    return Container(width: 1, height: 28, color: borde);
   }
 
   // ===========================================================================
@@ -511,524 +643,718 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
   }
 
   // ===========================================================================
-  // VISTA: ELEGIR JUGADA
+  // VISTA: PARTIDO EN VIVO (turno a turno)
   // ===========================================================================
 
-  Widget _vistaElegirJugada() {
+  Widget _vistaPartidoEnVivo() {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
+
+    return Column(
+      children: [
+        _buildHeaderPartido(),
+        Expanded(
+          child: Container(
+            color: fondo,
+            child: _fase == _Fase.jugandoTurno ? _buildPanelTurno() : _buildPanelRevelacion(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderPartido() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
-    final formacionActual = _formacionesInfo.firstWhere(
-      (f) => f.nombre == _miFormacion,
-      orElse: () => _formacionesInfo.first,
-    );
+    final minutoActual = _minutosClave.length > _indiceTurno ? _minutosClave[_indiceTurno] : 90;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        _buildHeaderRonda(textoPrincipal, textoSecundario, borde),
-
-        const SizedBox(height: 18),
-
-        // Matchup: mi equipo vs rival
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: superficie,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borde, width: 0.8),
-          ),
-          child: Row(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: superficie,
+        border: Border(bottom: BorderSide(color: borde, width: 0.8)),
+      ),
+      child: Column(
+        children: [
+          // Marcador
+          Row(
             children: [
               Expanded(
-                child: Column(
+                child: Row(
                   children: [
-                    _banderaCircular(_miEquipo.codigoBandera, size: 42),
-                    const SizedBox(height: 6),
-                    Text(
-                      _miEquipo.nombre,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textoPrincipal),
+                    _banderaCircular(_miEquipo!.codigoBandera, size: 28),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _miEquipo!.nombre,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: esOscuro ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Text(
-                  'VS',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textoSecundario, letterSpacing: 1),
+                  '$_golesMi - $_golesRival',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
                 ),
               ),
               Expanded(
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _banderaCircular(_rivalEquipo.codigoBandera, size: 42),
-                    const SizedBox(height: 6),
-                    Text(
-                      _rivalEquipo.nombre,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textoPrincipal),
+                    Expanded(
+                      child: Text(
+                        _rivalEquipo!.nombre,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    _banderaCircular(_rivalEquipo!.codigoBandera, size: 28),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-
-        const SizedBox(height: 22),
-
-        // Mini cancha con la formación
-        _buildMiniCancha(formacionActual),
-
-        const SizedBox(height: 22),
-
-        Text('Alineación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-        const SizedBox(height: 10),
-        ..._formacionesInfo.map((f) {
-          final elegida = _miFormacion == f.nombre;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _miFormacion = f.nombre);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: elegida ? AppColors.acento.withValues(alpha: 0.10) : superficie,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: elegida ? AppColors.acento : borde,
-                    width: elegida ? 1.6 : 0.8,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: elegida ? AppColors.acento : AppColors.acento.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        f.icono,
-                        size: 18,
-                        color: elegida ? Colors.white : AppColors.acento,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            f.nombre,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: elegida ? AppColors.acento : textoPrincipal,
-                            ),
-                          ),
-                          Text(
-                            f.descripcion,
-                            style: TextStyle(fontSize: 11, color: textoSecundario),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (elegida)
-                      const Icon(Icons.check_circle_rounded, size: 20, color: AppColors.acento),
-                  ],
-                ),
+          const SizedBox(height: 8),
+          // Reloj / momento
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.timer_outlined, size: 14, color: textoSecundario),
+              const SizedBox(width: 6),
+              Text(
+                minutoActual == 90 ? 'FIN DEL PARTIDO' : "Minuto $minutoActual · Ronda $_ronda de 4",
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoSecundario, letterSpacing: 0.3),
               ),
-            ),
-          );
-        }),
-
-        const SizedBox(height: 22),
-
-        Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-        const SizedBox(height: 10),
-        ..._estilosInfo.map((e) {
-          final elegido = _miEstilo == e.nombre;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _miEstilo = e.nombre);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: elegido ? e.color.withValues(alpha: 0.10) : superficie,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: elegido ? e.color : borde,
-                    width: elegido ? 1.6 : 0.8,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: elegido ? e.color : e.color.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        e.icono,
-                        size: 18,
-                        color: elegido ? Colors.white : e.color,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            e.nombre,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: elegido ? e.color : textoPrincipal,
-                            ),
-                          ),
-                          Text(
-                            e.descripcion,
-                            style: TextStyle(fontSize: 11, color: textoSecundario),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (elegido)
-                      Icon(Icons.check_circle_rounded, size: 20, color: e.color),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-
-        const SizedBox(height: 24),
-
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: FilledButton.icon(
-            onPressed: (_miFormacion != null && _miEstilo != null) ? _jugar : null,
-            icon: const Icon(Icons.sports_soccer_rounded, size: 22),
-            label: const Text(
-              'Jugar partido',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.acento,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: borde,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 6,
-              shadowColor: AppColors.acento.withValues(alpha: 0.45),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeaderRonda(Color textoPrincipal, Color textoSecundario, Color borde) {
-    return Row(
-      children: [
-        // Timeline de rondas
-        Expanded(
-          child: Row(
-            children: List.generate(4, (i) {
-              final numeroRonda = i + 1;
-              final Color color;
-              if (numeroRonda < _ronda) {
-                final gane = _historialRondas.length > i ? _historialRondas[i] : false;
-                color = gane ? const Color(0xFF2E9E5B) : const Color(0xFFE63946);
-              } else if (numeroRonda == _ronda) {
-                color = AppColors.acento;
-              } else {
-                color = borde;
-              }
-              return Expanded(
-                child: Container(
-                  height: 6,
-                  margin: EdgeInsets.only(right: i == 3 ? 0 : 5),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.acento.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'Ronda $_ronda/4',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.acento, letterSpacing: 0.3),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ===========================================================================
-  // MINI CANCHA
-  // ===========================================================================
-
-  Widget _buildMiniCancha(_FormacionInfo formacion) {
-    return Container(
-      height: 210,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF1E7A4A), Color(0xFF0E5A2E)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0E5A2E).withValues(alpha: 0.30),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            ],
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Stack(
-          children: [
-            // Líneas de la cancha
-            Positioned.fill(
-              child: CustomPaint(painter: _CanchaPainter()),
+    );
+  }
+
+  Widget _buildPanelTurno() {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+    final minutoActual = _minutosClave[_indiceTurno];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.acento.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'MINUTO $minutoActual',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.acento, letterSpacing: 0.6),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Momento clave del partido',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textoSecundario),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Formaciones
+          Text('Formación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _formaciones.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final f = _formaciones[i];
+                final elegida = _miFormacionTurno?.nombre == f.nombre;
+                return _buildCardOpcion(
+                  seleccionada: elegida,
+                  color: AppColors.acento,
+                  icono: f.icono,
+                  titulo: f.nombre,
+                  subtitulo: f.descripcion,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _miFormacionTurno = f);
+                  },
+                );
+              },
             ),
-            // Jugadores
-            ..._construirJugadores(formacion),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Estilos
+          Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _estilos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final e = _estilos[i];
+                final elegida = _miEstiloTurno?.nombre == e.nombre;
+                return _buildCardOpcion(
+                  seleccionada: elegida,
+                  color: e.color,
+                  icono: e.icono,
+                  titulo: e.nombre,
+                  subtitulo: e.descripcion,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _miEstiloTurno = e);
+                  },
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: FilledButton.icon(
+              onPressed: (_miFormacionTurno != null && _miEstiloTurno != null) ? _confirmarTurno : null,
+              icon: const Icon(Icons.sports_soccer_rounded, size: 22),
+              label: const Text(
+                'Confirmar jugada',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.acento,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 6,
+                shadowColor: AppColors.acento.withValues(alpha: 0.45),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardOpcion({
+    required bool seleccionada,
+    required Color color,
+    required IconData icono,
+    required String titulo,
+    required String subtitulo,
+    required VoidCallback onTap,
+  }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 110,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: seleccionada ? color.withValues(alpha: 0.10) : superficie,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: seleccionada ? color : borde,
+            width: seleccionada ? 1.8 : 0.8,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: seleccionada ? color : color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icono, size: 14, color: seleccionada ? Colors.white : color),
+                ),
+                const Spacer(),
+                if (seleccionada)
+                  Icon(Icons.check_circle_rounded, size: 16, color: color),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: seleccionada ? color : textoPrincipal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              subtitulo,
+              style: TextStyle(fontSize: 9.5, color: textoSecundario),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _construirJugadores(_FormacionInfo formacion) {
-    final jugadores = <Widget>[];
-    final total = formacion.lineas.length;
-    // Distribución vertical: defensa abajo, ataque arriba.
-    // En la pantalla, "abajo" es y grande y "arriba" es y chico.
-    // El arco propio está abajo, el rival arriba.
-    for (int i = 0; i < total; i++) {
-      final cantidad = formacion.lineas[i];
-      // Progreso: 0 = defensa (abajo), 1 = ataque (arriba).
-      final progreso = 1 - (i / (total - 1 == 0 ? 1 : total - 1));
-      // 0.15 (arriba) a 0.85 (abajo)
-      final y = 0.15 + (1 - progreso) * 0.7;
-
-      for (int j = 0; j < cantidad; j++) {
-        // Distribuir horizontalmente
-        final x = (j + 1) / (cantidad + 1);
-        jugadores.add(
-          Positioned.fill(
-            child: FractionallySizedBox(
-              alignment: Alignment(x * 2 - 1, y * 2 - 1),
-              widthFactor: null,
-              heightFactor: null,
-              child: Align(
-                alignment: Alignment(x * 2 - 1, y * 2 - 1),
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                    border: Border.all(color: AppColors.acento, width: 2),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-    return jugadores;
-  }
-
   // ===========================================================================
-  // VISTA: RESOLVIENDO
+  // VISTA: REVELACIÓN DEL TURNO
   // ===========================================================================
 
-  Widget _vistaResolviendo() {
+  Widget _buildPanelRevelacion() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
-    final miEstiloInfo = _estilosInfo.firstWhere((e) => e.nombre == _miEstilo);
-    final rivalEstiloInfo = _estilosInfo.firstWhere((e) => e.nombre == _rivalEstilo);
+    final resultado = _resultadoTurnoActual;
+    final esGol = resultado == _ResultadoTurno.golMio || resultado == _ResultadoTurno.golRival;
 
-    final String marcadorMostrado = _marcadorSorteo.isNotEmpty
-        ? _marcadorSorteo
-        : (_marcadorTexto.isNotEmpty ? _marcadorTexto : '—');
+    final colorResultado = switch (resultado) {
+      _ResultadoTurno.golMio => const Color(0xFF2E9E5B),
+      _ResultadoTurno.golRival => const Color(0xFFE63946),
+      _ => textoSecundario,
+    };
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Matchup con estilos enfrentados
-            Row(
+    final textResultado = switch (resultado) {
+      _ResultadoTurno.golMio => '¡GOL TUYO!',
+      _ResultadoTurno.golRival => 'GOL DEL RIVAL',
+      _ => 'SIN PELIGRO',
+    };
+
+    final iconoResultado = switch (resultado) {
+      _ResultadoTurno.golMio => Icons.sports_soccer_rounded,
+      _ResultadoTurno.golRival => Icons.sentiment_dissatisfied_rounded,
+      _ => Icons.shield_rounded,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Elección del rival
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: superficie,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borde, width: 0.8),
+            ),
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _banderaCircular(_miEquipo.codigoBandera, size: 56),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: miEstiloInfo.color.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          miEstiloInfo.nombre,
-                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: miEstiloInfo.color),
-                        ),
-                      ),
-                    ],
-                  ),
+                Text(
+                  'El rival eligió',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Text(
-                    'VS',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textoSecundario, letterSpacing: 1),
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _banderaCircular(_rivalEquipo.codigoBandera, size: 56),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: rivalEstiloInfo.color.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          rivalEstiloInfo.nombre,
-                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: rivalEstiloInfo.color),
-                        ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.acento.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(_rivalFormacionTurno?.icono ?? Icons.grid_view_rounded, size: 16, color: AppColors.acento),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Formación', style: TextStyle(fontSize: 10, color: textoSecundario)),
+                              Text(_rivalFormacionTurno?.nombre ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal)),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _rivalEstiloTurno?.color.withValues(alpha: 0.12) ?? Colors.grey.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(_rivalEstiloTurno?.icono ?? Icons.bolt_rounded, size: 16, color: _rivalEstiloTurno?.color ?? Colors.grey),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Estilo', style: TextStyle(fontSize: 10, color: textoSecundario)),
+                              Text(_rivalEstiloTurno?.nombre ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textoPrincipal)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+
+          // Resultado del turno (animado)
+          AnimatedScale(
+            scale: 1.0,
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+              decoration: BoxDecoration(
+                color: colorResultado.withValues(alpha: esGol ? 0.14 : 0.06),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: colorResultado.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(iconoResultado, size: 46, color: colorResultado),
+                  const SizedBox(height: 10),
+                  Text(
+                    textResultado,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: colorResultado,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  if (esGol) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '$_golesMi - $_golesRival',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // VISTA: PENALES
+  // ===========================================================================
+
+  Widget _vistaPenales() {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+    final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
+
+    final mostrarResultado = _detallesPenales.isNotEmpty &&
+        _timerAnimacion?.isActive == true;
+
+    return Container(
+      color: fondo,
+      child: Column(
+        children: [
+          // Marcador de penales
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              color: esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro,
+              border: Border(
+                bottom: BorderSide(
+                  color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro,
+                  width: 0.8,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _esMuerteSubita ? 'MUERTE SÚBITA' : 'PENALES',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.pro,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          _banderaCircular(_miEquipo!.codigoBandera, size: 28),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _miEquipo!.nombre,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: esOscuro ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$_penalesMi - $_penalesRival',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _rivalEquipo!.nombre,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textoPrincipal),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _banderaCircular(_rivalEquipo!.codigoBandera, size: 28),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Historial de tiros (burbujas)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    max(_tirosMi, _tirosRival) + 1,
+                    (i) {
+                      final detalleMio = i < _detallesPenales.where((d) => d.esMio).length
+                          ? _detallesPenales.where((d) => d.esMio).elementAt(i)
+                          : null;
+                      final detalleRival = i < _detallesPenales.where((d) => !d.esMio).length
+                          ? _detallesPenales.where((d) => !d.esMio).elementAt(i)
+                          : null;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Column(
+                          children: [
+                            _buildIndicadorPenal(detalleMio),
+                            const SizedBox(height: 4),
+                            _buildIndicadorPenal(detalleRival),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+          ),
+          Expanded(
+            child: mostrarResultado
+                ? _buildResultadoPenal(esOscuro, textoPrincipal, textoSecundario)
+                : _buildEleccionPenal(esOscuro, textoPrincipal, textoSecundario),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Marcador / estado
-            if (_mostrandoPenales) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.pro.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sports_soccer_rounded, size: 18, color: AppColors.pro),
-                    const SizedBox(width: 8),
-                    Text(
-                      'PENALES',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.pro, letterSpacing: 2),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                marcadorMostrado,
-                style: TextStyle(fontSize: 44, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
-              ),
-            ] else if (_marcadorTexto.isEmpty) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                decoration: BoxDecoration(
-                  color: superficie,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borde, width: 1),
-                ),
-                child: Text(
-                  marcadorMostrado,
-                  style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.acento.withValues(alpha: 0.55),
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Resolviendo el partido...',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textoSecundario),
-              ),
-            ] else if (_gane == null) ...[
-              Text(
-                'EMPATE $_marcadorTexto',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: textoPrincipal),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Se define por penales',
-                style: TextStyle(fontSize: 12, color: textoSecundario),
-              ),
-            ] else ...[
-              Text(
-                _marcadorTexto,
-                style: TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 3),
-              ),
+  Widget _buildIndicadorPenal(_DetallePenal? detalle) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+
+    if (detalle == null) {
+      return Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: borde, width: 1.5),
+        ),
+      );
+    }
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: detalle.fueGol ? const Color(0xFF2E9E5B) : const Color(0xFFE63946),
+      ),
+      child: Icon(
+        detalle.fueGol ? Icons.check_rounded : Icons.close_rounded,
+        size: 10,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildEleccionPenal(bool esOscuro, Color textoPrincipal, Color textoSecundario) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            _esTurnoMio ? '¡Es tu turno de patear!' : '¡Atajá el penal del rival!',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textoPrincipal),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _esTurnoMio
+                ? 'Elige dónde patear'
+                : 'Elige dónde se tira tu arquero',
+            style: TextStyle(fontSize: 13, color: textoSecundario),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildBotonZona(_ZonaPenal.izquierda, esOscuro),
+              _buildBotonZona(_ZonaPenal.centro, esOscuro),
+              _buildBotonZona(_ZonaPenal.derecha, esOscuro),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotonZona(_ZonaPenal zona, bool esOscuro) {
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final icono = switch (zona) {
+      _ZonaPenal.izquierda => Icons.arrow_back_rounded,
+      _ZonaPenal.centro => Icons.arrow_downward_rounded,
+      _ZonaPenal.derecha => Icons.arrow_forward_rounded,
+    };
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _resolverPenal(zona),
+      child: Container(
+        width: 84,
+        height: 84,
+        decoration: BoxDecoration(
+          color: AppColors.acento.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.acento.withValues(alpha: 0.4), width: 1.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icono, size: 26, color: AppColors.acento),
+            const SizedBox(height: 4),
+            Text(
+              switch (zona) {
+                _ZonaPenal.izquierda => 'Izq',
+                _ZonaPenal.centro => 'Centro',
+                _ZonaPenal.derecha => 'Der',
+              },
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: textoPrincipal),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildResultadoPenal(bool esOscuro, Color textoPrincipal, Color textoSecundario) {
+    final ultimoDetalle = _detallesPenales.last;
+    final color = ultimoDetalle.fueGol
+        ? (ultimoDetalle.esMio ? const Color(0xFF2E9E5B) : const Color(0xFFE63946))
+        : (ultimoDetalle.esMio ? const Color(0xFFE63946) : const Color(0xFF2E9E5B));
+
+    final String texto;
+    if (ultimoDetalle.esMio) {
+      texto = ultimoDetalle.fueGol ? '¡GOL!' : '¡Atajó el arquero!';
+    } else {
+      texto = ultimoDetalle.fueGol ? '¡Gol del rival!' : '¡Atajaste!';
+    }
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+            ),
+            child: Icon(
+              ultimoDetalle.fueGol ? Icons.sports_soccer_rounded : Icons.back_hand_rounded,
+              size: 44,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            texto,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -1044,12 +1370,18 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
-    final esCampeon = _gane == true && _ronda == 4;
-    final color = _gane == true ? const Color(0xFF2E9E5B) : const Color(0xFFE63946);
+    final huboPenales = _penalesMi != _penalesRival || _detallesPenales.isNotEmpty;
+    final gane = huboPenales ? _penalesMi > _penalesRival : _golesMi > _golesRival;
+    final esCampeon = gane && _ronda == 4;
+    final color = gane ? const Color(0xFF2E9E5B) : const Color(0xFFE63946);
+
+    final marcadorTexto = huboPenales
+        ? '${_golesMi} - ${_golesRival}  ·  Penales ${_penalesMi} - ${_penalesRival}'
+        : '$_golesMi - $_golesRival';
 
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1085,15 +1417,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                           ),
                           child: Center(
                             child: yaJugo
-                                ? Icon(
-                                    gano ? Icons.check_rounded : Icons.close_rounded,
-                                    size: 16,
-                                    color: colorRonda,
-                                  )
-                                : Text(
-                                    '$numeroRonda',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: colorRonda),
-                                  ),
+                                ? Icon(gano ? Icons.check_rounded : Icons.close_rounded, size: 16, color: colorRonda)
+                                : Text('$numeroRonda', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: colorRonda)),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1139,7 +1464,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
                 child: esCampeon
                     ? const Text('🏆', style: TextStyle(fontSize: 52))
                     : Icon(
-                        _gane == true ? Icons.emoji_events_rounded : Icons.sentiment_dissatisfied_rounded,
+                        gane ? Icons.emoji_events_rounded : Icons.sentiment_dissatisfied_rounded,
                         size: 56,
                         color: Colors.white,
                       ),
@@ -1148,20 +1473,23 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
             const SizedBox(height: 22),
 
             Text(
-              esCampeon
-                  ? '¡Campeón!'
-                  : (_gane == true ? '¡Victoria!' : 'Eliminado'),
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: color,
-                letterSpacing: -0.5,
-              ),
+              esCampeon ? '¡Campeón!' : (gane ? '¡Victoria!' : 'Eliminado'),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _marcadorTexto,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
+            const SizedBox(height: 10),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _banderaCircular(_miEquipo!.codigoBandera, size: 32),
+                const SizedBox(width: 12),
+                Text(
+                  marcadorTexto,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textoPrincipal, letterSpacing: 2),
+                ),
+                const SizedBox(width: 12),
+                _banderaCircular(_rivalEquipo!.codigoBandera, size: 32),
+              ],
             ),
             const SizedBox(height: 12),
 
@@ -1174,10 +1502,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               ),
               child: Text(
                 esCampeon
-                    ? '${_miEquipo.nombre} ganó el Mini Mundial'
-                    : (_gane == true
-                        ? 'Le ganaste a ${_rivalEquipo.nombre} en ${_etiquetaRonda(_ronda)}'
-                        : 'Te eliminó ${_rivalEquipo.nombre} en ${_etiquetaRonda(_ronda)}'),
+                    ? '${_miEquipo!.nombre} ganó el Mini Mundial'
+                    : (gane
+                        ? 'Le ganaste a ${_rivalEquipo!.nombre} en ${_etiquetaRonda(_ronda)}'
+                        : 'Te eliminó ${_rivalEquipo!.nombre} en ${_etiquetaRonda(_ronda)}'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: textoSecundario),
               ),
@@ -1191,17 +1519,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
               child: FilledButton.icon(
                 onPressed: esCampeon
                     ? _reiniciarTorneo
-                    : (_gane == true ? _siguienteRonda : _reiniciarTorneo),
+                    : (gane ? _siguienteRonda : _reiniciarTorneo),
                 icon: Icon(
-                  esCampeon
-                      ? Icons.refresh_rounded
-                      : (_gane == true ? Icons.arrow_forward_rounded : Icons.replay_rounded),
+                  esCampeon ? Icons.refresh_rounded : (gane ? Icons.arrow_forward_rounded : Icons.replay_rounded),
                   size: 20,
                 ),
                 label: Text(
-                  esCampeon
-                      ? 'Jugar de nuevo'
-                      : (_gane == true ? 'Siguiente ronda' : 'Intentar de nuevo'),
+                  esCampeon ? 'Jugar de nuevo' : (gane ? 'Siguiente ronda' : 'Intentar de nuevo'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
                 ),
                 style: FilledButton.styleFrom(
@@ -1266,83 +1590,4 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> {
       ),
     );
   }
-}
-
-// ===========================================================================
-// PAINTER DE LA CANCHA
-// ===========================================================================
-
-class _CanchaPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintLineas = Paint()
-      ..color = Colors.white.withValues(alpha: 0.28)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    // Borde de la cancha (con margen)
-    final margen = 12.0;
-    final rect = Rect.fromLTWH(margen, margen, size.width - margen * 2, size.height - margen * 2);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-      paintLineas,
-    );
-
-    // Línea del medio
-    canvas.drawLine(
-      Offset(margen, size.height / 2),
-      Offset(size.width - margen, size.height / 2),
-      paintLineas,
-    );
-
-    // Círculo central
-    canvas.drawCircle(
-      Offset(size.width / 2, size.height / 2),
-      24,
-      paintLineas,
-    );
-
-    // Área grande arriba
-    final areaAncho = size.width * 0.5;
-    final areaAlto = size.height * 0.16;
-    final areaTopRect = Rect.fromLTWH(
-      (size.width - areaAncho) / 2,
-      margen,
-      areaAncho,
-      areaAlto,
-    );
-    canvas.drawRect(areaTopRect, paintLineas);
-
-    // Área grande abajo
-    final areaBottomRect = Rect.fromLTWH(
-      (size.width - areaAncho) / 2,
-      size.height - margen - areaAlto,
-      areaAncho,
-      areaAlto,
-    );
-    canvas.drawRect(areaBottomRect, paintLineas);
-
-    // Área chica arriba
-    final areaChicaAncho = size.width * 0.28;
-    final areaChicaAlto = size.height * 0.08;
-    final areaChicaTopRect = Rect.fromLTWH(
-      (size.width - areaChicaAncho) / 2,
-      margen,
-      areaChicaAncho,
-      areaChicaAlto,
-    );
-    canvas.drawRect(areaChicaTopRect, paintLineas);
-
-    // Área chica abajo
-    final areaChicaBottomRect = Rect.fromLTWH(
-      (size.width - areaChicaAncho) / 2,
-      size.height - margen - areaChicaAlto,
-      areaChicaAncho,
-      areaChicaAlto,
-    );
-    canvas.drawRect(areaChicaBottomRect, paintLineas);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

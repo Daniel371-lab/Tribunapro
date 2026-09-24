@@ -11,7 +11,7 @@ class TriviaJuegoScreen extends StatefulWidget {
   State<TriviaJuegoScreen> createState() => _TriviaJuegoScreenState();
 }
 
-class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTickerProviderStateMixin {
+class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with TickerProviderStateMixin {
   int _indice = 0;
   int _aciertos = 0;
   int? _opcionElegida;
@@ -22,6 +22,7 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
   late final List<bool?> _resultados = List.filled(widget.preguntas.length, null);
 
   late final AnimationController _feedbackController;
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
@@ -30,12 +31,17 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
   }
 
   @override
   void dispose() {
     _timerFeedback?.cancel();
     _feedbackController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -52,17 +58,25 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
     });
 
     _feedbackController.forward(from: 0);
+    _pulseController.repeat(reverse: true);
 
+    // A los 1.5s se cierra el feedback y se pasa AUTOMÁTICAMENTE a la
+    // siguiente pregunta (o se cierra la pantalla si era la última).
     _timerFeedback = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() => _mostrarFeedback = false);
-        _feedbackController.reset();
-      }
+      if (!mounted) return;
+      setState(() {
+        _mostrarFeedback = false;
+      });
+      _feedbackController.reset();
+      _pulseController.stop();
+      _pulseController.reset();
+      _avanzarAutomaticamente();
     });
   }
 
-  void _siguiente() {
+  void _avanzarAutomaticamente() {
     if (_indice == widget.preguntas.length - 1) {
+      // Era la última pregunta: cerramos con el puntaje.
       Navigator.of(context).pop(_aciertos);
       return;
     }
@@ -73,18 +87,27 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
     });
   }
 
+  // BUG FIX: capturamos el navigator ANTES de abrir el diálogo, para
+  // poder cerrar la pantalla sin depender de un context destruido.
   void _confirmarSalir() {
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('¿Salir del reto?'),
-        content: const Text('Si sales ahora, pierdes el progreso de hoy y no vas a poder repetirlo hasta mañana.'),
+        content: const Text(
+          'Si sales ahora, pierdes el progreso de hoy y no vas a poder repetirlo hasta mañana.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(-1);
+              Navigator.of(dialogContext).pop();
+              navigator.pop(-1);
             },
             child: const Text('Salir'),
           ),
@@ -130,14 +153,11 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final fondo = esOscuro ? AppColors.fondoOscuro : AppColors.fondoClaro;
-    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
-    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
     final pregunta = widget.preguntas[_indice];
     final acertoLaActual = _resultados[_indice] == true;
-    final colorDificultad = _colorDificultad(pregunta.dificultad);
 
     return PopScope(
       canPop: false,
@@ -149,12 +169,16 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
         body: SafeArea(
           child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              // Contenido scrolleable: la pregunta y las opciones pueden
+              // ser más largas que la pantalla, pero el usuario puede
+              // bajar para ver todo.
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ─── Header: X + anillo de progreso ───
+                    // ─── Header ───
                     Row(
                       children: [
                         IconButton(
@@ -178,19 +202,13 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
                     ),
                     const SizedBox(height: 14),
 
-                    // ─── Barra de circulitos (uno por pregunta) ───
+                    // ─── Barra de circulitos ───
                     Row(
                       children: List.generate(_resultados.length, (i) {
+                        final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
                         Color color = borde;
-                        Color colorBorde = borde;
-                        if (_resultados[i] == true) {
-                          color = const Color(0xFF2E9E5B);
-                          colorBorde = const Color(0xFF2E9E5B);
-                        }
-                        if (_resultados[i] == false) {
-                          color = const Color(0xFFE63946);
-                          colorBorde = const Color(0xFFE63946);
-                        }
+                        if (_resultados[i] == true) color = const Color(0xFF2E9E5B);
+                        if (_resultados[i] == false) color = const Color(0xFFE63946);
                         final esActual = i == _indice;
 
                         return Expanded(
@@ -204,7 +222,7 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
                               borderRadius: BorderRadius.circular(8),
                               border: esActual && _resultados[i] == null
                                   ? Border.all(color: AppColors.acento, width: 1.5)
-                                  : (color == borde ? Border.all(color: colorBorde, width: 1) : null),
+                                  : (color == borde ? Border.all(color: borde, width: 1) : null),
                             ),
                           ),
                         );
@@ -213,200 +231,22 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
                     const SizedBox(height: 22),
 
                     // ─── Chip de dificultad ───
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: colorDificultad.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: colorDificultad.withValues(alpha: 0.35), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(_iconoDificultad(pregunta.dificultad), size: 14, color: colorDificultad),
-                          const SizedBox(width: 6),
-                          Text(
-                            _etiquetaDificultad(pregunta.dificultad),
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                              color: colorDificultad,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildChipDificultad(pregunta.dificultad),
                     const SizedBox(height: 14),
 
-                    // ─── Pregunta en tarjeta ───
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: superficie,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: borde, width: 0.8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (esOscuro ? Colors.black : const Color(0xFF1A1A1A)).withValues(alpha: 0.06),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        pregunta.pregunta,
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: textoPrincipal,
-                          height: 1.35,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
+                    // ─── Pregunta ───
+                    _buildTarjetaPregunta(pregunta.pregunta, esOscuro, textoPrincipal),
                     const SizedBox(height: 22),
 
-                    // ─── Opciones con letra A/B/C/D ───
+                    // ─── Opciones ───
                     ...List.generate(pregunta.opciones.length, (i) {
-                      final esCorrecta = i == pregunta.correcta;
-                      final esElegida = i == _opcionElegida;
-
-                      Color colorBorde = borde;
-                      Color colorFondo = superficie;
-                      Color colorLetra = AppColors.acento;
-                      Color colorLetraFondo = AppColors.acento.withValues(alpha: 0.12);
-                      IconData? iconoEstado;
-
-                      if (_respondido) {
-                        if (esCorrecta) {
-                          colorBorde = const Color(0xFF2E9E5B);
-                          colorFondo = const Color(0xFF2E9E5B).withValues(alpha: 0.10);
-                          colorLetra = Colors.white;
-                          colorLetraFondo = const Color(0xFF2E9E5B);
-                          iconoEstado = Icons.check_rounded;
-                        } else if (esElegida) {
-                          colorBorde = const Color(0xFFE63946);
-                          colorFondo = const Color(0xFFE63946).withValues(alpha: 0.10);
-                          colorLetra = Colors.white;
-                          colorLetraFondo = const Color(0xFFE63946);
-                          iconoEstado = Icons.close_rounded;
-                        }
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: AnimatedScale(
-                          scale: _respondido && (esCorrecta || esElegida) ? 1.0 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _responder(i),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOut,
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: colorFondo,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: colorBorde,
-                                  width: _respondido && (esCorrecta || esElegida) ? 1.8 : 1.2,
-                                ),
-                                boxShadow: _respondido && esCorrecta
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFF2E9E5B).withValues(alpha: 0.20),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Row(
-                                children: [
-                                  // Letra identificadora
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: colorLetraFondo,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        String.fromCharCode(65 + i), // A, B, C, D
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          color: colorLetra,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      pregunta.opciones[i],
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: textoPrincipal,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ),
-                                  if (iconoEstado != null)
-                                    Icon(iconoEstado, size: 22, color: colorBorde),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
+                      return _buildOpcion(i, pregunta, textoPrincipal);
                     }),
-
-                    const Spacer(),
-
-                    // ─── Botón siguiente ───
-                    if (_respondido)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: FilledButton(
-                          onPressed: _siguiente,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.acento,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 6,
-                            shadowColor: AppColors.acento.withValues(alpha: 0.45),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _indice == widget.preguntas.length - 1 ? 'Ver resultado' : 'Siguiente',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                _indice == widget.preguntas.length - 1
-                                    ? Icons.emoji_events_rounded
-                                    : Icons.arrow_forward_rounded,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
 
-              // ─── Feedback flotante con animación de entrada ───
+              // ─── Feedback flotante ───
               Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedOpacity(
@@ -473,7 +313,179 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> with SingleTicker
     );
   }
 
-  // ─── Anillo de progreso del header ───
+  Widget _buildChipDificultad(String dificultad) {
+    final colorDificultad = _colorDificultad(dificultad);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: colorDificultad.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorDificultad.withValues(alpha: 0.35), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_iconoDificultad(dificultad), size: 14, color: colorDificultad),
+          const SizedBox(width: 6),
+          Text(
+            _etiquetaDificultad(dificultad),
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: colorDificultad,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTarjetaPregunta(String texto, bool esOscuro, Color textoPrincipal) {
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: superficie,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borde, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: (esOscuro ? Colors.black : const Color(0xFF1A1A1A)).withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w800,
+          color: textoPrincipal,
+          height: 1.35,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOpcion(int i, dynamic pregunta, Color textoPrincipal) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+
+    final esCorrecta = i == pregunta.correcta;
+    final esElegida = i == _opcionElegida;
+
+    Color colorBorde = borde;
+    Color colorFondo = superficie;
+    Color colorLetra = AppColors.acento;
+    Color colorLetraFondo = AppColors.acento.withValues(alpha: 0.12);
+    IconData? iconoEstado;
+
+    if (_respondido) {
+      if (esCorrecta) {
+        colorBorde = const Color(0xFF2E9E5B);
+        colorFondo = const Color(0xFF2E9E5B).withValues(alpha: 0.10);
+        colorLetra = Colors.white;
+        colorLetraFondo = const Color(0xFF2E9E5B);
+        iconoEstado = Icons.check_rounded;
+      } else if (esElegida) {
+        colorBorde = const Color(0xFFE63946);
+        colorFondo = const Color(0xFFE63946).withValues(alpha: 0.10);
+        colorLetra = Colors.white;
+        colorLetraFondo = const Color(0xFFE63946);
+        iconoEstado = Icons.close_rounded;
+      }
+    }
+
+    final tieneLatido = _respondido && esCorrecta;
+
+    Widget contenido = AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: colorFondo,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorBorde,
+          width: _respondido && (esCorrecta || esElegida) ? 1.8 : 1.2,
+        ),
+        boxShadow: _respondido && esCorrecta
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF2E9E5B).withValues(alpha: 0.20),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colorLetraFondo,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                String.fromCharCode(65 + i),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: colorLetra,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              pregunta.opciones[i],
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: textoPrincipal,
+                height: 1.3,
+              ),
+            ),
+          ),
+          if (iconoEstado != null)
+            Icon(iconoEstado, size: 22, color: colorBorde),
+        ],
+      ),
+    );
+
+    if (tieneLatido) {
+      contenido = AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final escala = 1.0 + (_pulseController.value * 0.06);
+          return Transform.scale(scale: escala, child: child);
+        },
+        child: contenido,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _responder(i),
+        child: contenido,
+      ),
+    );
+  }
+
   Widget _buildAnilloProgreso(bool esOscuro) {
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
