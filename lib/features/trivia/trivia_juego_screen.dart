@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/models/trivia_pregunta.dart';
@@ -15,13 +16,30 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> {
   int _aciertos = 0;
   int? _opcionElegida;
   bool _respondido = false;
+  bool _mostrarFeedback = false;
+  Timer? _timerFeedback;
+
+  late final List<bool?> _resultados = List.filled(widget.preguntas.length, null);
+
+  @override
+  void dispose() {
+    _timerFeedback?.cancel();
+    super.dispose();
+  }
 
   void _responder(int opcion) {
     if (_respondido) return;
+    final esCorrecta = opcion == widget.preguntas[_indice].correcta;
     setState(() {
       _opcionElegida = opcion;
       _respondido = true;
-      if (opcion == widget.preguntas[_indice].correcta) _aciertos++;
+      _resultados[_indice] = esCorrecta;
+      _mostrarFeedback = true;
+      if (esCorrecta) _aciertos++;
+    });
+
+    _timerFeedback = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _mostrarFeedback = false);
     });
   }
 
@@ -57,6 +75,28 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> {
     );
   }
 
+  String _etiquetaDificultad(String dificultad) {
+    switch (dificultad) {
+      case 'facil':
+        return 'Fácil';
+      case 'dificil':
+        return 'Difícil';
+      default:
+        return 'Media';
+    }
+  }
+
+  Color _colorDificultad(String dificultad) {
+    switch (dificultad) {
+      case 'facil':
+        return Colors.green;
+      case 'dificil':
+        return Colors.redAccent;
+      default:
+        return Colors.orangeAccent;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
@@ -67,6 +107,7 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> {
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
 
     final pregunta = widget.preguntas[_indice];
+    final acertoLaActual = _resultados[_indice] == true;
 
     return PopScope(
       canPop: false,
@@ -76,96 +117,164 @@ class _TriviaJuegoScreenState extends State<TriviaJuegoScreen> {
       child: Scaffold(
         backgroundColor: fondo,
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, color: textoPrincipal),
-                      onPressed: _confirmarSalir,
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.close_rounded, color: textoPrincipal),
+                          onPressed: _confirmarSalir,
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Pregunta ${_indice + 1} de ${widget.preguntas.length}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textoSecundario),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
                     ),
-                    Expanded(
+                    const SizedBox(height: 10),
+                    Row(
+                      children: List.generate(_resultados.length, (i) {
+                        Color color = borde;
+                        if (_resultados[i] == true) color = Colors.green;
+                        if (_resultados[i] == false) color = Colors.redAccent;
+
+                        return Expanded(
+                          child: Container(
+                            height: 6,
+                            margin: EdgeInsets.only(right: i == _resultados.length - 1 ? 0 : 4),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _colorDificultad(pregunta.dificultad).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: Text(
-                        'Pregunta ${_indice + 1} de ${widget.preguntas.length}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textoSecundario),
+                        'Dificultad: ${_etiquetaDificultad(pregunta.dificultad)}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: _colorDificultad(pregunta.dificultad),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      pregunta.pregunta,
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textoPrincipal, height: 1.3),
+                    ),
+                    const SizedBox(height: 28),
+                    ...List.generate(pregunta.opciones.length, (i) {
+                      final esCorrecta = i == pregunta.correcta;
+                      final esElegida = i == _opcionElegida;
+
+                      Color colorBorde = borde;
+                      Color colorFondo = superficie;
+                      if (_respondido) {
+                        if (esCorrecta) {
+                          colorBorde = Colors.green;
+                          colorFondo = Colors.green.withOpacity(0.12);
+                        } else if (esElegida) {
+                          colorBorde = Colors.red;
+                          colorFondo = Colors.red.withOpacity(0.12);
+                        }
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => _responder(i),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: colorFondo,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: colorBorde, width: 1.2),
+                            ),
+                            child: Text(
+                              pregunta.opciones[i],
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textoPrincipal),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const Spacer(),
+                    if (_respondido)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _siguiente,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.acento,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text(_indice == widget.preguntas.length - 1 ? 'Ver resultado' : 'Siguiente'),
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: (_indice + (_respondido ? 1 : 0)) / widget.preguntas.length,
-                    minHeight: 6,
-                    backgroundColor: borde,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.acento),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  pregunta.pregunta,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textoPrincipal, height: 1.3),
-                ),
-                const SizedBox(height: 28),
-                ...List.generate(pregunta.opciones.length, (i) {
-                  final esCorrecta = i == pregunta.correcta;
-                  final esElegida = i == _opcionElegida;
-
-                  Color colorBorde = borde;
-                  Color colorFondo = superficie;
-                  if (_respondido) {
-                    if (esCorrecta) {
-                      colorBorde = Colors.green;
-                      colorFondo = Colors.green.withOpacity(0.12);
-                    } else if (esElegida) {
-                      colorBorde = Colors.red;
-                      colorFondo = Colors.red.withOpacity(0.12);
-                    }
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => _responder(i),
+              ),
+              // Tarjetita flotante de feedback, arriba de todo, se esfuma sola.
+              Positioned(
+                top: 8,
+                left: 0,
+                right: 0,
+                child: AnimatedOpacity(
+                  opacity: _mostrarFeedback ? 1 : 0,
+                  duration: const Duration(milliseconds: 250),
+                  child: IgnorePointer(
+                    child: Center(
                       child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                         decoration: BoxDecoration(
-                          color: colorFondo,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: colorBorde, width: 1.2),
+                          color: acertoLaActual ? Colors.green.shade600 : Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 3)),
+                          ],
                         ),
-                        child: Text(
-                          pregunta.opciones[i],
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textoPrincipal),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              acertoLaActual ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              acertoLaActual ? '¡Correcto!' : 'Incorrecto',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  );
-                }),
-                const Spacer(),
-                if (_respondido)
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _siguiente,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.acento,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(_indice == widget.preguntas.length - 1 ? 'Ver resultado' : 'Siguiente'),
                     ),
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

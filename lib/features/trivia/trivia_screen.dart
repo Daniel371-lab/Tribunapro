@@ -122,75 +122,106 @@ class _TriviaScreenState extends State<TriviaScreen> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5, color: textoPrincipal),
                 ),
                 const SizedBox(height: 20),
+                // Tarjeta principal con degradé para que la sección sea más
+                // llamativa, en vez del contenedor plano que tenía antes.
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   decoration: BoxDecoration(
-                    color: superficie,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.acento.withOpacity(0.18),
+                        AppColors.pro.withOpacity(0.10),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: borde, width: 0.8),
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      Text(
-                        estado.yaJugoHoy ? 'Ya completaste tu reto de hoy' : 'Poné a prueba tu conocimiento hoy',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: textoPrincipal),
-                      ),
-                      const SizedBox(height: 24),
+                      // Círculo más chico que antes (72 en vez de 140).
                       SizedBox(
-                        width: 140,
-                        height: 140,
+                        width: 72,
+                        height: 72,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
                             SizedBox(
-                              width: 140,
-                              height: 140,
+                              width: 72,
+                              height: 72,
                               child: CircularProgressIndicator(
                                 value: estado.yaJugoHoy ? estado.aciertos / 10 : 0,
-                                strokeWidth: 10,
+                                strokeWidth: 6,
                                 backgroundColor: borde,
                                 valueColor: AlwaysStoppedAnimation(_colorSegunAciertos(estado.aciertos)),
                               ),
                             ),
                             Text(
                               estado.yaJugoHoy ? '${estado.aciertos}/10' : '—',
-                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textoPrincipal),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textoPrincipal),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      if (estado.yaJugoHoy) ...[
-                        Text(
-                          _mensajeSegunAciertos(estado.aciertos),
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _colorSegunAciertos(estado.aciertos)),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      Text(
-                        estado.yaJugoHoy ? 'Volvé mañana para un nuevo reto' : '10 preguntas de fútbol te esperan',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: textoSecundario),
-                      ),
-                      const SizedBox(height: 24),
-                      if (!estado.yaJugoHoy)
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: _jugar,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.acento,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              estado.yaJugoHoy ? 'Ya completaste tu reto de hoy' : 'Poné a prueba tu conocimiento hoy',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal),
                             ),
-                            child: const Text('Jugar'),
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              estado.yaJugoHoy
+                                  ? _mensajeSegunAciertos(estado.aciertos)
+                                  : '10 preguntas de fútbol te esperan',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: estado.yaJugoHoy ? FontWeight.w600 : FontWeight.normal,
+                                color: estado.yaJugoHoy ? _colorSegunAciertos(estado.aciertos) : textoSecundario,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                if (!estado.yaJugoHoy)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _jugar,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Jugar'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.acento,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: superficie,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borde, width: 0.8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Volvé mañana para un nuevo reto',
+                        style: TextStyle(fontSize: 12.5, color: textoSecundario),
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 28),
                 Text(
                   'INSIGNIAS',
@@ -225,49 +256,52 @@ class _TriviaScreenState extends State<TriviaScreen> {
                     ),
                   )
                 else
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _definicionInsignias.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 0.85,
-                    ),
-                    itemBuilder: (context, index) {
-                      final insignia = _definicionInsignias[index];
-                      final desbloqueada = estado.insignias.contains(insignia.clave);
+                  // Carrusel horizontal deslizable, en vez de la grilla fija
+                  // de antes. Tarjetas más chicas (88 de ancho).
+                  SizedBox(
+                    height: 96,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: _definicionInsignias.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        final insignia = _definicionInsignias[index];
+                        final desbloqueada = estado.insignias.contains(insignia.clave);
 
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: superficie,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: borde, width: 0.8),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              insignia.icono,
-                              size: 26,
-                              color: desbloqueada ? insignia.color : textoSecundario.withOpacity(0.4),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              insignia.titulo,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                                color: desbloqueada ? textoPrincipal : textoSecundario.withOpacity(0.5),
+                        return Container(
+                          width: 88,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: superficie,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: borde, width: 0.8),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                insignia.icono,
+                                size: 22,
+                                color: desbloqueada ? insignia.color : textoSecundario.withOpacity(0.4),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                              const SizedBox(height: 6),
+                              Text(
+                                insignia.titulo,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: desbloqueada ? textoPrincipal : textoSecundario.withOpacity(0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
               ],
             );

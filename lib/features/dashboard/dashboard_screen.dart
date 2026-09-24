@@ -3,15 +3,46 @@ import 'package:go_router/go_router.dart';
 import '../../core/ads/interstitial_ad_manager.dart';
 import '../../core/models/partido.dart';
 import '../../core/services/firestore_service.dart';
+import '../../core/services/trivia_service.dart';
 import '../../core/widgets/estado_vacio.dart';
 import 'widgets/partido_card.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _servicio = FirestoreService();
+  final _triviaServicio = TriviaService();
+
+  Future<Widget> _estadoVacioConTrivia() async {
+    final yaJugo = await _triviaServicio.yaJugoHoy();
+
+    if (!yaJugo) {
+      return EstadoVacio(
+        icono: Icons.sports_soccer_rounded,
+        titulo: 'No hay partidos próximos',
+        subtitulo: 'Mientras esperás, ¿qué tal un desafío de trivia?',
+        textoBoton: 'Jugar trivia',
+        onBoton: () => context.push('/trivia'),
+      );
+    }
+
+    final aciertos = await _triviaServicio.aciertosDeHoy();
+    return EstadoVacio(
+      icono: Icons.sports_soccer_rounded,
+      titulo: 'No hay partidos próximos',
+      subtitulo: 'Ya completaste tu trivia de hoy ($aciertos/10). Volvé mañana por más.',
+      textoBoton: 'Ver mis insignias',
+      onBoton: () => context.push('/trivia'),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final servicio = FirestoreService();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafeArea(
@@ -25,24 +56,24 @@ class DashboardScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text.rich(
-  TextSpan(
-    children: [
-      TextSpan(
-        text: 'Tribuna ',
-        style: TextStyle(color: isDark ? Colors.white : Colors.black),
-      ),
-      const TextSpan(
-        text: 'Pro',
-        style: TextStyle(color: Color(0xFF890F20)),
-      ),
-    ],
-  ),
-  style: const TextStyle(
-    fontSize: 22,
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.5,
-  ),
-),
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Tribuna ',
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      ),
+                      const TextSpan(
+                        text: 'Pro',
+                        style: TextStyle(color: Color(0xFF890F20)),
+                      ),
+                    ],
+                  ),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, size: 24),
                   onPressed: () => context.push('/ajustes'),
@@ -68,7 +99,7 @@ class DashboardScreen extends StatelessWidget {
           // Lista de partidos desglosada
           Expanded(
             child: StreamBuilder<List<Partido>>(
-              stream: servicio.proximosPartidos(),
+              stream: _servicio.proximosPartidos(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return const EstadoVacio(
@@ -82,10 +113,18 @@ class DashboardScreen extends StatelessWidget {
                 }
                 final partidos = snapshot.data!;
                 if (partidos.isEmpty) {
-                  return const EstadoVacio(
-                    icono: Icons.sports_soccer_rounded,
-                    titulo: 'No hay partidos próximos',
-                    subtitulo: 'Estamos preparando los próximos encuentros. Volvé en un rato.',
+                  return FutureBuilder<Widget>(
+                    future: _estadoVacioConTrivia(),
+                    builder: (context, snapshotTrivia) {
+                      if (!snapshotTrivia.hasData) {
+                        return const EstadoVacio(
+                          icono: Icons.sports_soccer_rounded,
+                          titulo: 'No hay partidos próximos',
+                          subtitulo: 'Estamos preparando los próximos encuentros. Volvé en un rato.',
+                        );
+                      }
+                      return snapshotTrivia.data!;
+                    },
                   );
                 }
                 return ListView.builder(
