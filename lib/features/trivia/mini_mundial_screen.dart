@@ -205,10 +205,9 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
     _relojController.reset();
     _relojController.duration = Duration(
-      milliseconds: 900 + ((minutoActual - minutoAnterior) * 22).clamp(600, 2000),
+      milliseconds: 1500 + ((minutoActual - minutoAnterior) * 30).clamp(1000, 3000),
     );
 
-    // Listener para ir actualizando el minuto mostrado.
     void listener() {
       final valor = _relojController.value;
       final minuto = (minutoAnterior + (minutoActual - minutoAnterior) * valor).round();
@@ -222,7 +221,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _relojController.forward().then((_) {
       _relojController.removeListener(listener);
       if (!mounted) return;
-      HapticFeedback.selectionClick();
+      HapticFeedback.mediumImpact();
       setState(() => _fase = _Fase.jugandoTurno);
     });
   }
@@ -768,21 +767,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               ),
             ),
             Positioned.fill(child: CustomPaint(painter: _CanchaHorizontalPainter())),
-            // Rival (derecha)
             if (rivalFormEnPizarra != null)
-              ..._construirDotsFormacion(
-                rivalFormEnPizarra,
-                esRival: true,
-                controller: _dotsRivalController,
-              ),
-            // Mi equipo (izquierda)
+              ..._construirDotsFormacion(rivalFormEnPizarra, esRival: true, controller: _dotsRivalController),
             if (_miFormacionTurno != null)
-              ..._construirDotsFormacion(
-                _miFormacionTurno!,
-                esRival: false,
-                controller: null,
-              ),
-            // Etiquetas
+              ..._construirDotsFormacion(_miFormacionTurno!, esRival: false, controller: null),
             Positioned(
               top: 4,
               right: 6,
@@ -802,10 +790,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   Widget _buildPillEquipo(String codigoBandera, String nombre, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -833,8 +818,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       final cantidad = lineas[i];
       final double fraccionLinea = i / (totalLineas - 1 == 0 ? 1 : totalLineas - 1);
 
-      // Coordenada horizontal: mi equipo defensa a la izquierda, ataque al centro.
-      // Rival: defensa a la derecha, ataque al centro.
       final double x;
       if (esRival) {
         x = 0.88 - fraccionLinea * 0.32;
@@ -851,10 +834,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           decoration: BoxDecoration(
             color: esRival ? Colors.red.shade200 : Colors.white,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: esRival ? Colors.red.shade900 : AppColors.acento,
-              width: 1.3,
-            ),
+            border: Border.all(color: esRival ? Colors.red.shade900 : AppColors.acento, width: 1.3),
             boxShadow: [
               BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 2, offset: const Offset(0, 1)),
             ],
@@ -875,12 +855,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           );
         }
 
-        dots.add(
-          Align(
-            alignment: Alignment(x * 2 - 1, y * 2 - 1),
-            child: dotFinal,
-          ),
-        );
+        dots.add(Align(alignment: Alignment(x * 2 - 1, y * 2 - 1), child: dotFinal));
       }
     }
     return dots;
@@ -902,15 +877,9 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         children: [
           Icon(Icons.sports_soccer_rounded, size: 40, color: AppColors.acento),
           const SizedBox(height: 12),
-          Text(
-            'El partido sigue...',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal),
-          ),
+          Text('El partido sigue...', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal)),
           const SizedBox(height: 4),
-          Text(
-            'Se acerca un momento clave',
-            style: TextStyle(fontSize: 12.5, color: textoSecundario),
-          ),
+          Text('Se acerca un momento clave', style: TextStyle(fontSize: 12.5, color: textoSecundario)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -941,25 +910,25 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.acento.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   "MINUTO $minutoActual'",
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.acento, letterSpacing: 0.6),
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: AppColors.acento, letterSpacing: 0.6),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Elegí tu estrategia',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textoSecundario),
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: textoSecundario),
                 ),
               ),
             ],
@@ -967,20 +936,20 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Formación', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-                const SizedBox(height: 8),
+                Text('Formación', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+                const SizedBox(height: 6),
                 SizedBox(
-                  height: 96,
+                  height: 74,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
                     itemCount: _formaciones.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
                       final f = _formaciones[i];
                       final elegida = _miFormacionTurno?.nombre == f.nombre;
@@ -998,16 +967,16 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text('Forma de juego', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                Text('Forma de juego', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
+                const SizedBox(height: 6),
                 SizedBox(
-                  height: 96,
+                  height: 74,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
                     itemCount: _estilos.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
                       final e = _estilos[i];
                       final elegida = _miEstiloTurno?.nombre == e.nombre;
@@ -1030,19 +999,19 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 48,
             child: FilledButton.icon(
               onPressed: (_miFormacionTurno != null && _miEstiloTurno != null) ? _confirmarTurno : null,
               icon: const Icon(Icons.sports_soccer_rounded, size: 20),
-              label: const Text('Confirmar jugada', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+              label: const Text('Confirmar jugada', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.acento,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 elevation: 6,
                 shadowColor: AppColors.acento.withValues(alpha: 0.45),
               ),
@@ -1068,17 +1037,17 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 106,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        width: 88,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: seleccionada ? color.withValues(alpha: 0.10) : superficie,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: seleccionada ? color : borde, width: seleccionada ? 1.8 : 0.8),
-          boxShadow: seleccionada ? [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 3))] : null,
+          boxShadow: seleccionada ? [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 8, offset: const Offset(0, 2))] : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1087,28 +1056,28 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             Row(
               children: [
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
                     color: seleccionada ? color : color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icono, size: 13, color: seleccionada ? Colors.white : color),
+                  child: Icon(icono, size: 12, color: seleccionada ? Colors.white : color),
                 ),
                 const Spacer(),
-                if (seleccionada) Icon(Icons.check_circle_rounded, size: 15, color: color),
+                if (seleccionada) Icon(Icons.check_circle_rounded, size: 14, color: color),
               ],
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             Text(
               titulo,
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               subtitulo,
-              style: TextStyle(fontSize: 9, color: textoSecundario),
+              style: TextStyle(fontSize: 8.5, color: textoSecundario),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1827,47 +1796,21 @@ class _CanchaHorizontalPainter extends CustomPainter {
 
     final margen = 6.0;
 
-    // Borde
     final rect = Rect.fromLTWH(margen, margen, size.width - margen * 2, size.height - margen * 2);
     canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
 
-    // Línea del medio (VERTICAL, no horizontal)
-    canvas.drawLine(
-      Offset(size.width / 2, margen),
-      Offset(size.width / 2, size.height - margen),
-      paint,
-    );
-
-    // Círculo central
+    canvas.drawLine(Offset(size.width / 2, margen), Offset(size.width / 2, size.height - margen), paint);
     canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.height * 0.26, paint);
 
-    // Área grande izquierda
     final areaAncho = size.width * 0.12;
     final areaAlto = size.height * 0.55;
-    canvas.drawRect(
-      Rect.fromLTWH(margen, (size.height - areaAlto) / 2, areaAncho, areaAlto),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(margen, (size.height - areaAlto) / 2, areaAncho, areaAlto), paint);
+    canvas.drawRect(Rect.fromLTWH(size.width - margen - areaAncho, (size.height - areaAlto) / 2, areaAncho, areaAlto), paint);
 
-    // Área grande derecha
-    canvas.drawRect(
-      Rect.fromLTWH(size.width - margen - areaAncho, (size.height - areaAlto) / 2, areaAncho, areaAlto),
-      paint,
-    );
-
-    // Área chica izquierda
     final areaChicaAncho = size.width * 0.05;
     final areaChicaAlto = size.height * 0.28;
-    canvas.drawRect(
-      Rect.fromLTWH(margen, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto),
-      paint,
-    );
-
-    // Área chica derecha
-    canvas.drawRect(
-      Rect.fromLTWH(size.width - margen - areaChicaAncho, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(margen, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto), paint);
+    canvas.drawRect(Rect.fromLTWH(size.width - margen - areaChicaAncho, (size.height - areaChicaAlto) / 2, areaChicaAncho, areaChicaAlto), paint);
   }
 
   @override

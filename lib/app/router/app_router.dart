@@ -10,7 +10,6 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/competencias/competencias_screen.dart';
 import '../../features/competencias/competencia_detail_screen.dart';
 import '../../features/favoritos/favoritos_screen.dart';
-import '../../features/trivia/trivia_screen.dart';
 import '../../features/historial/historial_screen.dart';
 import '../../features/ajustes/ajustes_screen.dart';
 import '../../features/partido/partido_detail_screen.dart';
@@ -108,11 +107,6 @@ class AppRouter {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/trivia', builder: (context, state) => const TriviaScreen()),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
               GoRoute(path: '/historial', builder: (context, state) => const HistorialScreen()),
             ],
           ),
@@ -141,8 +135,6 @@ class _AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<_AppShell> {
-  // Gris viejo de la barra inferior en modo claro. No queremos que herede
-  // el gris nuevo (#E5E8EC) que usan las cards de partidos.
   static const Color _grisBarraClaro = Color(0xFFF5F7FA);
 
   double _dragDistance = 0;
@@ -189,31 +181,42 @@ class _AppShellState extends State<_AppShell> {
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            NavigationBar(
-              backgroundColor: colorBarra,
-              selectedIndex: widget.navigationShell.currentIndex,
-              onDestinationSelected: (index) => widget.navigationShell.goBranch(
-                index,
-                initialLocation: index == widget.navigationShell.currentIndex,
+            // La NavigationBar NO debe agregar su propio padding inferior,
+            // porque el SafeArea de abajo ya maneja el espacio del sistema.
+            MediaQuery.removePadding(
+              context: context,
+              removeBottom: true,
+              child: NavigationBar(
+                backgroundColor: colorBarra,
+                height: 62,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                labelTextStyle: WidgetStateProperty.all(
+                  const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                selectedIndex: widget.navigationShell.currentIndex,
+                onDestinationSelected: (index) => widget.navigationShell.goBranch(
+                  index,
+                  initialLocation: index == widget.navigationShell.currentIndex,
+                ),
+                destinations: const [
+                  NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
+                  NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Torneos'),
+                  NavigationDestination(icon: Icon(Icons.star_outline), label: 'Favoritos'),
+                  NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
+                ],
               ),
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
-                NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Competencias'),
-                NavigationDestination(icon: Icon(Icons.star_outline), label: 'Favoritos'),
-                NavigationDestination(icon: Icon(Icons.psychology_outlined), label: 'Juegos'),
-                NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
-              ],
             ),
-            // Banner dinámico: si el usuario es Pro, se elimina por completo
-            // (SizedBox.shrink) y la barra inferior baja automáticamente.
-            // Si no es Pro, aparece el banner con su SafeArea.
+            // Acá abajo se maneja UNA sola vez el espacio del sistema + banner.
             ValueListenableBuilder<bool>(
               valueListenable: esProNotifier,
               builder: (context, esPro, _) {
-                if (esPro) return const SizedBox.shrink();
                 return SafeArea(
                   top: false,
-                  child: const BannerAdWidget(),
+                  child: esPro ? const SizedBox.shrink() : const BannerAdWidget(),
                 );
               },
             ),
