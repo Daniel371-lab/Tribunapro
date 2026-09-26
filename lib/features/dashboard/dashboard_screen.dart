@@ -27,7 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         titulo: 'No hay partidos próximos',
         subtitulo: 'Mientras esperás, ¿qué tal un desafío de trivia?',
         textoBoton: 'Jugar trivia',
-        onBoton: () => context.push('/trivia'),
+        onBoton: () => context.push('/juegos'),
       );
     }
 
@@ -37,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       titulo: 'No hay partidos próximos',
       subtitulo: 'Ya completaste tu trivia de hoy ($aciertos/10). Volvé mañana por más.',
       textoBoton: 'Ver mis insignias',
-      onBoton: () => context.push('/trivia'),
+      onBoton: () => context.push('/juegos'),
     );
   }
 

@@ -855,7 +855,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final rivalFormEnPizarra = revelando ? _rivalFormacionTurno : null;
 
     return Container(
-      height: 120,
+      height: 88,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borde, width: 0.8),
@@ -1006,10 +1006,6 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final minutoActual = _minutosClave[_indiceTurno];
 
-    // Preview de energía: si hay estilo seleccionado, mostrar el efecto.
-    final energiaPreview = _miEstiloTurno == null
-        ? _energia
-        : (_energia + _miEstiloTurno!.costoEnergia).clamp(0.0, 100.0);
 
     return Column(
       children: [
@@ -1043,30 +1039,30 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro, width: 0.8),
-            ),
-            child: Column(
-              children: [
-                _buildBarraEstado(
-                  icono: Icons.speed_rounded,
-                  etiqueta: 'Energía',
-                  valor: energiaPreview,
-                  color: _colorEnergia(energiaPreview),
-                ),
-                const SizedBox(height: 8),
-                _buildBarraEstado(
-                  icono: Icons.psychology_rounded,
-                  etiqueta: 'Moral',
-                  valor: _moral,
-                  color: _colorMoral(_moral),
-                ),
-              ],
-            ),
-          ),
+  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+  decoration: BoxDecoration(
+    color: esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro, width: 0.8),
+  ),
+  child: Column(
+    children: [
+      _buildBarraEstado(
+        icono: Icons.speed_rounded,
+        etiqueta: 'Energía',
+        valor: _energia,
+        color: _colorEnergia(_energia),
+      ),
+      const SizedBox(height: 6),
+      _buildBarraEstado(
+        icono: Icons.psychology_rounded,
+        etiqueta: 'Moral',
+        valor: _moral,
+        color: _colorMoral(_moral),
+      ),
+    ],
+  ),
+),
         ),
 
         Expanded(
@@ -1114,10 +1110,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
+  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+  child: SizedBox(
+    width: double.infinity,
+    height: 44,
             child: FilledButton.icon(
               onPressed: (_miFormacionTurno != null && _miEstiloTurno != null) ? _confirmarTurno : null,
               icon: const Icon(Icons.sports_soccer_rounded, size: 20),
@@ -1148,11 +1144,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
 
     return Row(
-      children: [
-        Icon(icono, size: 16, color: color),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 60,
+  children: [
+    Icon(icono, size: 14, color: color),
+    const SizedBox(width: 6),
+    SizedBox(
+      width: 54,
           child: Text(
             etiqueta,
             style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoPrincipal),
@@ -1162,8 +1158,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: valor / 100,
-              minHeight: 8,
+            value: valor / 100,
+            minHeight: 6,
               backgroundColor: textoSecundario.withValues(alpha: 0.15),
               valueColor: AlwaysStoppedAnimation(color),
             ),
