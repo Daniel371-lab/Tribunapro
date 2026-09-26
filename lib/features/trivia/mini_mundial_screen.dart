@@ -28,10 +28,11 @@ class _EstiloInfo {
   final String nombre;
   final int ataqueBonus;
   final int defensaBonus;
+  final int costoEnergia;
   final String descripcion;
   final IconData icono;
   final Color color;
-  const _EstiloInfo(this.nombre, this.ataqueBonus, this.defensaBonus, this.descripcion, this.icono, this.color);
+  const _EstiloInfo(this.nombre, this.ataqueBonus, this.defensaBonus, this.costoEnergia, this.descripcion, this.icono, this.color);
 }
 
 enum _ResultadoTurno { golMio, golRival, nada }
@@ -78,11 +79,11 @@ const _formaciones = [
 ];
 
 const _estilos = [
-  _EstiloInfo('Posesión', 2, 1, 'Controlá el balón', Icons.psychology_rounded, Color(0xFF3B82F6)),
-  _EstiloInfo('Contraataque', 1, 2, 'Esperá y explotá', Icons.bolt_rounded, Color(0xFFE8B923)),
-  _EstiloInfo('Presión Alta', 3, 0, 'Asfixiá al rival', Icons.local_fire_department_rounded, Color(0xFFE63946)),
-  _EstiloInfo('Juego de Bandas', 2, 0, 'Jugá por los costados', Icons.swap_horiz_rounded, Color(0xFF8B5CF6)),
-  _EstiloInfo('Defensa Cerrada', 0, 3, 'Cerrá el arco', Icons.shield_rounded, Color(0xFF2E9E5B)),
+  _EstiloInfo('Posesión', 2, 1, 5, 'Controlá el balón', Icons.psychology_rounded, Color(0xFF3B82F6)),
+  _EstiloInfo('Contraataque', 1, 2, -5, 'Esperá y explotá', Icons.bolt_rounded, Color(0xFFE8B923)),
+  _EstiloInfo('Presión Alta', 3, 0, -20, 'Asfixiá al rival', Icons.local_fire_department_rounded, Color(0xFFE63946)),
+  _EstiloInfo('Juego de Bandas', 2, 0, -10, 'Jugá por los costados', Icons.swap_horiz_rounded, Color(0xFF8B5CF6)),
+  _EstiloInfo('Defensa Cerrada', 0, 3, 10, 'Cerrá el arco', Icons.shield_rounded, Color(0xFF2E9E5B)),
 ];
 
 // ============================================================================
@@ -110,6 +111,11 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   List<int> _minutosClave = [];
   int _indiceTurno = 0;
   int _minutoMostrado = 0;
+
+  // Energía: por partido, arranca en 100.
+  double _energia = 100;
+  // Moral: por torneo, arranca en 100. Baja a 50 si empatás.
+  double _moral = 100;
 
   _FormacionInfo? _miFormacionTurno;
   _EstiloInfo? _miEstiloTurno;
@@ -165,6 +171,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     setState(() {
       _historialRondas.clear();
       _ronda = 1;
+      _moral = 100;
       _fase = _Fase.eligiendoEquipo;
     });
   }
@@ -175,6 +182,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       _miEquipo = equipo;
       _rivalEquipo = restantes[_random.nextInt(restantes.length)];
       _ronda = 1;
+      _moral = 100;
       _historialRondas.clear();
       _iniciarPartido();
     });
@@ -186,6 +194,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _minutosClave = _generarMinutos();
     _indiceTurno = 0;
     _minutoMostrado = 0;
+    _energia = 100;
     _miFormacionTurno = null;
     _miEstiloTurno = null;
     _rivalFormacionTurno = null;
@@ -230,11 +239,15 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     if (_miFormacionTurno == null || _miEstiloTurno == null) return;
     HapticFeedback.selectionClick();
 
+    // Aplicamos el costo/recuperación de energía del estilo elegido.
+    final nuevaEnergia = (_energia + _miEstiloTurno!.costoEnergia).clamp(0.0, 100.0);
+
     final rivalForm = _formaciones[_random.nextInt(_formaciones.length)];
     final rivalEst = _estilos[_random.nextInt(_estilos.length)];
-    final resultado = _resolverTurno(_miFormacionTurno!, _miEstiloTurno!, rivalForm, rivalEst);
+    final resultado = _resolverTurno(_miFormacionTurno!, _miEstiloTurno!, rivalForm, rivalEst, nuevaEnergia);
 
     setState(() {
+      _energia = nuevaEnergia;
       _rivalFormacionTurno = rivalForm;
       _rivalEstiloTurno = rivalEst;
       _resultadoTurnoActual = resultado;
@@ -282,7 +295,9 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
   void _terminarPartido() {
     if (_golesMi == _golesRival) {
+      // Empate: la moral baja a 50 (mínimo).
       setState(() {
+        if (_moral > 50) _moral = 50;
         _penalesMi = 0;
         _penalesRival = 0;
         _tirosMi = 0;
@@ -294,7 +309,12 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       });
       return;
     }
-    _guardarResultadoRonda(_golesMi > _golesRival);
+    final gane = _golesMi > _golesRival;
+    // Si ganó y la moral estaba en 50, vuelve a 100.
+    if (gane && _moral < 100) {
+      _moral = 100;
+    }
+    _guardarResultadoRonda(gane);
     setState(() => _fase = _Fase.resultado);
   }
 
@@ -324,8 +344,31 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     setState(() {
       _historialRondas.clear();
       _ronda = 1;
+      _moral = 100;
+      _energia = 100;
       _fase = _Fase.eligiendoEquipo;
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // MODIFICADORES DE ENERGÍA Y MORAL
+  // ---------------------------------------------------------------------------
+
+  // Devuelve los modificadores (ataque, defensa) según la energía.
+  // 100-80: 0/0 · 79-60: -1/0 · 59-40: -1/-1 · 39-20: -2/-1 · 19-0: -2/-2
+  Map<String, int> _modificadorEnergia(double energia) {
+    if (energia >= 80) return {'ataque': 0, 'defensa': 0};
+    if (energia >= 60) return {'ataque': -1, 'defensa': 0};
+    if (energia >= 40) return {'ataque': -1, 'defensa': -1};
+    if (energia >= 20) return {'ataque': -2, 'defensa': -1};
+    return {'ataque': -2, 'defensa': -2};
+  }
+
+  // Devuelve el modificador de moral (solo ataque).
+  // 100: 0 · 50: -1
+  int _modificadorMoral(double moral) {
+    if (moral >= 100) return 0;
+    return -1;
   }
 
   // ---------------------------------------------------------------------------
@@ -337,9 +380,21 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     _EstiloInfo miEst,
     _FormacionInfo rivalForm,
     _EstiloInfo rivalEst,
+    double energiaEfectiva,
   ) {
-    final miAtaque = miForm.ataque + miEst.ataqueBonus;
-    final miDefensa = miForm.defensa + miEst.defensaBonus;
+    // Stats base
+    int miAtaque = miForm.ataque + miEst.ataqueBonus;
+    int miDefensa = miForm.defensa + miEst.defensaBonus;
+
+    // Modificadores de energía
+    final modEnergia = _modificadorEnergia(energiaEfectiva);
+    miAtaque += modEnergia['ataque']!;
+    miDefensa += modEnergia['defensa']!;
+
+    // Modificador de moral (solo ataque)
+    miAtaque += _modificadorMoral(_moral);
+
+    // El rival no tiene energía ni moral.
     final rivalAtaque = rivalForm.ataque + rivalEst.ataqueBonus;
     final rivalDefensa = rivalForm.defensa + rivalEst.defensaBonus;
 
@@ -414,7 +469,10 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   void _terminarPenales() {
-    _guardarResultadoRonda(_penalesMi > _penalesRival);
+    final gane = _penalesMi > _penalesRival;
+    // Si ganó por penales, la moral no sube (porque empató los 90').
+    // Se queda en 50. En la próxima ronda, si gana, subirá a 100.
+    _guardarResultadoRonda(gane);
     setState(() => _fase = _Fase.resultado);
   }
 
@@ -630,8 +688,8 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       children: [
         _buildHeaderPartido(),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-          child: _buildPizarra(revelando, corriendo),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          child: _buildPizarra(revelando),
         ),
         Expanded(
           child: Container(
@@ -657,7 +715,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
         : (_minutosClave.length > _indiceTurno ? _minutosClave[_indiceTurno] : 90);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
         color: superficie,
         border: Border(bottom: BorderSide(color: borde, width: 0.8)),
@@ -711,19 +769,39 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.timer_outlined, size: 14, color: textoSecundario),
-              const SizedBox(width: 6),
+              Icon(Icons.timer_outlined, size: 13, color: textoSecundario),
+              const SizedBox(width: 5),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Text(
                   minutoActual == 90 ? 'FIN DEL PARTIDO' : "Minuto $minutoActual' · Ronda $_ronda de 4",
                   key: ValueKey(minutoActual),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textoSecundario, letterSpacing: 0.3),
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoSecundario, letterSpacing: 0.3),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Chips de energía y moral
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildChipEstado(
+                icono: Icons.speed_rounded,
+                etiqueta: 'Energía',
+                valor: _energia,
+                color: _colorEnergia(_energia),
+              ),
+              const SizedBox(width: 8),
+              _buildChipEstado(
+                icono: Icons.psychology_rounded,
+                etiqueta: 'Moral',
+                valor: _moral,
+                color: _colorMoral(_moral),
               ),
             ],
           ),
@@ -732,18 +810,52 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     );
   }
 
+  Widget _buildChipEstado({
+    required IconData icono,
+    required String etiqueta,
+    required double valor,
+    required Color color,
+  }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            etiqueta,
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: textoPrincipal),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${valor.round()}',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ===========================================================================
-  // PIZARRA (cancha horizontal)
+  // PIZARRA
   // ===========================================================================
 
-  Widget _buildPizarra(bool revelando, bool corriendo) {
+  Widget _buildPizarra(bool revelando) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
-
     final rivalFormEnPizarra = revelando ? _rivalFormacionTurno : null;
 
     return Container(
-      height: 130,
+      height: 120,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borde, width: 0.8),
@@ -862,14 +974,13 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
   }
 
   // ===========================================================================
-  // PANEL: RELOJ CORRIENDO
+  // PANEL: RELOJ CORRIENDO (sin "próximo momento")
   // ===========================================================================
 
   Widget _buildPanelReloj() {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
-    final minutoObjetivo = _minutosClave[_indiceTurno];
 
     return Center(
       child: Column(
@@ -879,19 +990,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
           const SizedBox(height: 12),
           Text('El partido sigue...', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textoPrincipal)),
           const SizedBox(height: 4),
-          Text('Se acerca un momento clave', style: TextStyle(fontSize: 12.5, color: textoSecundario)),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.acento.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Próximo momento: minuto $minutoObjetivo',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.acento, letterSpacing: 0.3),
-            ),
-          ),
+          Text('Momento clave en camino', style: TextStyle(fontSize: 12.5, color: textoSecundario)),
         ],
       ),
     );
@@ -907,10 +1006,15 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
     final minutoActual = _minutosClave[_indiceTurno];
 
+    // Preview de energía: si hay estilo seleccionado, mostrar el efecto.
+    final energiaPreview = _miEstiloTurno == null
+        ? _energia
+        : (_energia + _miEstiloTurno!.costoEnergia).clamp(0.0, 100.0);
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
           child: Row(
             children: [
               Container(
@@ -934,6 +1038,37 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             ],
           ),
         ),
+
+        // Barras de energía y moral (con preview de energía)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro, width: 0.8),
+            ),
+            child: Column(
+              children: [
+                _buildBarraEstado(
+                  icono: Icons.speed_rounded,
+                  etiqueta: 'Energía',
+                  valor: energiaPreview,
+                  color: _colorEnergia(energiaPreview),
+                ),
+                const SizedBox(height: 8),
+                _buildBarraEstado(
+                  icono: Icons.psychology_rounded,
+                  etiqueta: 'Moral',
+                  valor: _moral,
+                  color: _colorMoral(_moral),
+                ),
+              ],
+            ),
+          ),
+        ),
+
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
@@ -944,7 +1079,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                 Text('Formación', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
                 const SizedBox(height: 6),
                 SizedBox(
-                  height: 74,
+                  height: 86,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -953,17 +1088,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                     itemBuilder: (context, i) {
                       final f = _formaciones[i];
                       final elegida = _miFormacionTurno?.nombre == f.nombre;
-                      return _buildCardOpcion(
-                        seleccionada: elegida,
-                        color: AppColors.acento,
-                        icono: f.icono,
-                        titulo: f.nombre,
-                        subtitulo: f.descripcion,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _miFormacionTurno = f);
-                        },
-                      );
+                      return _buildCardFormacion(f, elegida);
                     },
                   ),
                 ),
@@ -971,7 +1096,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                 Text('Forma de juego', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1, color: textoSecundario)),
                 const SizedBox(height: 6),
                 SizedBox(
-                  height: 74,
+                  height: 98,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -980,17 +1105,7 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
                     itemBuilder: (context, i) {
                       final e = _estilos[i];
                       final elegida = _miEstiloTurno?.nombre == e.nombre;
-                      return _buildCardOpcion(
-                        seleccionada: elegida,
-                        color: e.color,
-                        icono: e.icono,
-                        titulo: e.nombre,
-                        subtitulo: e.descripcion,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _miEstiloTurno = e);
-                        },
-                      );
+                      return _buildCardEstilo(e, elegida);
                     },
                   ),
                 ),
@@ -1022,14 +1137,52 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
     );
   }
 
-  Widget _buildCardOpcion({
-    required bool seleccionada,
-    required Color color,
+  Widget _buildBarraEstado({
     required IconData icono,
-    required String titulo,
-    required String subtitulo,
-    required VoidCallback onTap,
+    required String etiqueta,
+    required double valor,
+    required Color color,
   }) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    return Row(
+      children: [
+        Icon(icono, size: 16, color: color),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 60,
+          child: Text(
+            etiqueta,
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textoPrincipal),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: valor / 100,
+              minHeight: 8,
+              backgroundColor: textoSecundario.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '${valor.round()}',
+            textAlign: TextAlign.end,
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardFormacion(_FormacionInfo f, bool elegida) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
     final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
     final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
@@ -1038,16 +1191,18 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _miFormacionTurno = f);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 88,
+        width: 96,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: seleccionada ? color.withValues(alpha: 0.10) : superficie,
+          color: elegida ? AppColors.acento.withValues(alpha: 0.10) : superficie,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: seleccionada ? color : borde, width: seleccionada ? 1.8 : 0.8),
-          boxShadow: seleccionada ? [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 8, offset: const Offset(0, 2))] : null,
+          border: Border.all(color: elegida ? AppColors.acento : borde, width: elegida ? 1.8 : 0.8),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1056,30 +1211,99 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
             Row(
               children: [
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
-                    color: seleccionada ? color : color.withValues(alpha: 0.12),
+                    color: elegida ? AppColors.acento : AppColors.acento.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icono, size: 12, color: seleccionada ? Colors.white : color),
+                  child: Icon(f.icono, size: 11, color: elegida ? Colors.white : AppColors.acento),
                 ),
                 const Spacer(),
-                if (seleccionada) Icon(Icons.check_circle_rounded, size: 14, color: color),
+                if (elegida) const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.acento),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              titulo,
-              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: seleccionada ? color : textoPrincipal),
+              f.nombre,
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: elegida ? AppColors.acento : textoPrincipal),
+            ),
+            Text(
+              f.descripcion,
+              style: TextStyle(fontSize: 8.5, color: textoSecundario),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'ATQ ${f.ataque} · DEF ${f.defensa}',
+              style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: textoSecundario),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardEstilo(_EstiloInfo e, bool elegida) {
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final superficie = esOscuro ? AppColors.superficieOscuro : AppColors.superficieClaro;
+    final borde = esOscuro ? AppColors.bordeOscuro : AppColors.bordeClaro;
+    final textoPrincipal = esOscuro ? AppColors.textoOscuro : AppColors.textoClaro;
+    final textoSecundario = esOscuro ? AppColors.textoSecundarioOscuro : AppColors.textoSecundarioClaro;
+
+    final textoEnergia = e.costoEnergia > 0
+        ? '+${e.costoEnergia}'
+        : '${e.costoEnergia}';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _miEstiloTurno = e);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 106,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: elegida ? e.color.withValues(alpha: 0.10) : superficie,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: elegida ? e.color : borde, width: elegida ? 1.8 : 0.8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: elegida ? e.color : e.color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(e.icono, size: 11, color: elegida ? Colors.white : e.color),
+                ),
+                const Spacer(),
+                if (elegida) Icon(Icons.check_circle_rounded, size: 14, color: e.color),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              e.nombre,
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: elegida ? e.color : textoPrincipal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              subtitulo,
-              style: TextStyle(fontSize: 8.5, color: textoSecundario),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              'ATQ +${e.ataqueBonus} · DEF +${e.defensaBonus}',
+              style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: textoSecundario),
+            ),
+            Text(
+              'Energía $textoEnergia',
+              style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: e.color),
             ),
           ],
         ),
@@ -1746,6 +1970,21 @@ class _MiniMundialScreenState extends State<MiniMundialScreen> with TickerProvid
       default:
         return 'Ronda $ronda';
     }
+  }
+
+  // ===========================================================================
+  // COLORES DE ESTADO
+  // ===========================================================================
+
+  Color _colorEnergia(double valor) {
+    if (valor >= 80) return const Color(0xFF2E9E5B);
+    if (valor >= 40) return const Color(0xFFE8B923);
+    return const Color(0xFFE63946);
+  }
+
+  Color _colorMoral(double valor) {
+    if (valor >= 100) return const Color(0xFF2E9E5B);
+    return const Color(0xFFE63946);
   }
 
   // ===========================================================================
